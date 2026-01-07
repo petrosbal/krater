@@ -28,6 +28,12 @@ A benchmark comparing floating-point performance and resource efficiency across 
 
 ## Installation & Setup
 
+1. **Build and Import Images**:
+Use the Makefile to build all Docker container images and import them into the K3s registry.
+```bash
+make dall
+```
+
 ```mermaid
 flowchart TD
     Root[make dall]
@@ -59,11 +65,6 @@ flowchart TD
     Root --> DebianFlow
     Root --> StaticFlow
     Root --> WasmFlow
-```
-1. **Build and Import Images**:
-Use the Makefile to build all Docker container images and import them into the K3s registry.
-```bash
-make dall
 ```
 Creates `mmb-debian:latest`, `mmb-static:latest`, `mmb-wasm:latest`
 
@@ -137,6 +138,13 @@ Results are saved to JSON. Each entry (`<size>_<mode>`) contains:
 
 ### 1. Phases (Timestamps)
 
+Lifecycle events, recorded as Unix timestamps:
+
+* `start`: Deployment trigger time
+* `running_time`: Pod reached `Running` state
+* `bench_start`: The moment the C application prints `BENCH_START` (after optional warmup).
+* `end`: The moment the C application prints `BENCH_END`.
+
 ```mermaid
 ---
 config:
@@ -170,12 +178,6 @@ gantt
     bench_start                  :milestone, m2, after ben2, 0s
     ‎ end                 :milestone, m3, after ben3, 0s
 ```
-Lifecycle events, recorded as Unix timestamps:
-
-* `start`: Deployment trigger time
-* `running_time`: Pod reached `Running` state
-* `bench_start`: The moment the C application prints `BENCH_START` (after optional warmup).
-* `end`: The moment the C application prints `BENCH_END`.
 
 ### 2. Parsed Metrics (Application Log)
 
