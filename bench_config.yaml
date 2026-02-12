@@ -1,0 +1,28 @@
+# bench_config.yaml
+environments:
+  - image: mmb-debian:latest
+    runtime_class: default
+
+  - image: mmb-static:latest
+    runtime_class: default
+
+  - image: mmb-wasm:latest
+    runtime_class: wasmtime
+
+  - image: mmb-wasm:latest
+    runtime_class: wasmedge
+
+  - image: mmb-wasm:latest
+    runtime_class: wasmer
+
+  - image: mmb-wasm:latest
+    runtime_class: wamr
+
+shared_args:
+  sizes: [256]
+  trials: 2
+  duration: 10
+  warmup: false
+  interval: 2.0
+  namespace: default
+  results_subfolder_name: testin

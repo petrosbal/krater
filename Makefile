@@ -1,7 +1,7 @@
 export DOCKER_BUILDKIT=1
 IMAGES = mmb-debian:latest mmb-static:latest mmb-wasm:latest
 
-.PHONY: dall dclean ddebian dstatic dwasm dclean kclean
+.PHONY: dall ddebian dstatic dwasm dclean kclean resclean
 
 # dci builds
 
@@ -28,5 +28,9 @@ dclean:
 	docker rmi -f $(IMAGES) || true
 	docker image prune -f
 
+# attention! it deletes every pod in the cluster
 kclean:
 	kubectl delete pods --all --force --grace-period=0
+
+resclean:
+	sudo rm -rf ./results

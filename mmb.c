@@ -1,10 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <time.h>
 #include <math.h>
 
-// i switched the j and k loops and increased iterations by 36,000%. insane
+#define VAL_A 1.1
+#define VAL_B 2.2
+
 void matrix_mult(double *A, double *B, double *C, int N) {
     for(int i=0;i<N*N;i++) C[i] = 0.0;
 
@@ -19,18 +20,16 @@ void matrix_mult(double *A, double *B, double *C, int N) {
 }
 
 int valid_results(double *C, int N) {
-    double expected_value = 1.1 * 2.2 * N;
-    double tol = 1e-9; // tolerance
+    double expected_value = VAL_A * VAL_B * N;
+    double tolerance = 1e-9 *N;
 
     for (int i = 0; i < N*N; i++) {
-        if (fabs(C[i] - expected_value) > tol) { // found a mismatch
+        if (fabs(C[i] - expected_value) > tolerance) { // found a mismatch
             printf("\nERROR\nc[i]: %10.9f\nexp:  %10.9f\ndiff: %10.9f\ntol:  %10.9f\n\n",
-                                C[i], expected_value, fabs(C[i] - expected_value), tol);
-            return 0; 
+                                C[i], expected_value, fabs(C[i] - expected_value), tolerance);
+            return 0;
         }
     }
-    /*printf("\nNO ERROR\nc[i]: %10.9f\nexp:  %10.9f\ndiff: %10.9f\ntol:  %10.9f\n\n",
-                                C[0], expected_value, fabs(C[0] - expected_value), tol);*/
     return 1;  // all elements are correct
 }
 
@@ -54,10 +53,10 @@ int main(int argc, char *argv[]) {
     if (!A || !B || !C) return 1;
 
     for (int i=0;i<N*N;i++) {
-        A[i]=1.1; B[i]=2.2;
+        A[i] = VAL_A; B[i] = VAL_B;
     }
 
-    // optional warmup
+    // optional warmup (takes at least 5 secs)
     if (do_warmup) {
         struct timespec w_start, w_now;
         timespec_get(&w_start, TIME_UTC);
@@ -75,7 +74,6 @@ int main(int argc, char *argv[]) {
     struct timespec t_start, t_now;
     timespec_get(&t_start, TIME_UTC);
     double elapsed = 0.0;
-    double last_update = 0;
     int iterations = 0;
 
     while (elapsed < duration) {
@@ -83,22 +81,16 @@ int main(int argc, char *argv[]) {
         iterations++;
         timespec_get(&t_now, TIME_UTC);
         elapsed = (t_now.tv_sec - t_start.tv_sec) + (t_now.tv_nsec - t_start.tv_nsec)/1e9;
-
-        //if (elapsed - last_update > 2) {
-        //printf("\rRunning benchmark: %.1f%% ", (elapsed/duration)*100); fflush(stdout);
-        //last_update = elapsed;
-        //}
     }
     printf("BENCH_END\n"); fflush(stdout);
 
-    // output calculations
     double mflops = 2.0 * N * N * N * iterations / elapsed / 1e6; // 2*N^3 flops per matrix multiplication
 
     printf("\niterations: %d\nelapsed time: %.6f s\nthroughput: %.2f MFLOPS\ncalculation check: %s\n\n",
         iterations,
         elapsed,
         mflops,
-        valid_results(C, N) ? "PASSED" : "FAILED !!!!");
+        valid_results(C, N) ? "PASSED" : "FAILED");
 
     free(A); free(B); free(C);
 }
