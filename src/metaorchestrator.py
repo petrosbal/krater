@@ -4,8 +4,8 @@ import sys
 import os
 from pathlib import Path
 
-YAML_FILE = "bench_config.yaml"
-SCRIPT_NAME = "single_env_bench.py"
+YAML_FILE = "src/bench_config.yaml"
+SCRIPT_NAME = "src/single_env_bench.py"
 PYTHON_EXEC = sys.executable # i use the orchestrator's interpreter for the single env script
 
 def load_config(path):

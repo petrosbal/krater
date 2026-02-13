@@ -10,25 +10,40 @@ import yaml
 class CgroupHandler:
     
     # stores pod uid, hunts down cgroup path to prepare for monitoring
-    def __init__(self, pod_uid):
+    def __init__(self, pod_uid, custom_root = None):
         self.pod_uid = pod_uid
         self.uid_underscore = pod_uid.replace("-", "_")
-        self.version = 2
+        self.search_roots = [custom_root] if custom_root else ["/sys/fs/cgroup/kubepods.slice", "/sys/fs/cgroup"]
         self.path = None
         self._find_path()
 
     # finds location of cpu and ram usage for the running pod
     def _find_path(self):
-        roots = ["/sys/fs/cgroup/kubepods.slice", "/sys/fs/cgroup"]
-        search_root = next((r for r in roots if os.path.exists(r)), "/sys/fs/cgroup")
         targets = [f"pod{self.pod_uid}", f"pod{self.uid_underscore}"]
+        found_paths = []
         
-        for root, dirs, _ in os.walk(search_root):
-            if any(t in root for t in targets):
-                self.path = root
-                self.version = 2 if os.path.exists(os.path.join(root, "cgroup.controllers")) else 1
-                return
-        raise RuntimeError(f"Cgroup path for pod {self.pod_uid} not found")
+        for root_str in self.search_roots:
+            root_path = Path(root_str)
+            if not root_path.exists():
+                continue
+
+            for path in root_path.rglob("*"):
+                if any(t in path.name for t in targets):
+                    if (path / "cpu.stat").exists() or (path / "cpu.acct.usage()").exists():
+                        found_paths.append(path)
+                        
+        if not found_paths:
+                    raise RuntimeError(f"Cgroup path for pod {self.pod_uid} not found")
+
+        # choosing the correct path
+        # the pod-level cgroup is the one with the least depth
+        # because containers are subfolders in it
+        # horrible bug to fix
+        self.path = str(min(found_paths, key=lambda p: len(p.parts)))
+        
+        # determine version based on selected path
+        self.version = 2 if (Path(self.path) / "cgroup.controllers").exists() else 1
+        print(f"   [cgroup] Selected path: {self.path} (v{self.version})")
 
     # captures a timestamped snapshot of the metrics by parsing files
     # support cgroup v2 (certainly) and v1 (in theory)
@@ -90,24 +105,38 @@ class CgroupHandler:
                                 metrics["rss_bytes"] = int(parts[1])
                                 break
 
-        except Exception:
+        except FileNotFoundError as e:
+            print(f"   [cgroup] file not found during read: {e.filename}")
             return None
+        except PermissionError:
+            print(f"   [cgroup] permission denied. are you root?")
+            return None
+        except Exception as e:
+            print(f"   [cgroup] unexpected error reading stats: {type(e).__name__}: {e}")
+
         return metrics
 
 # ---------------
 # kubectl helpers
 # ---------------
 
+
+from pathlib import Path
+DEFAULT_KUBECONFIG = os.environ.get("KUBECONFIG", "/etc/rancher/k3s/k3s.yaml")
+
 # executes a kubectl command via subprocess, returns full process result
 def kubectl(cmd_args, env=None, capture_output=True, check=False, input_bytes=None):
     env = env or os.environ.copy()
     if "KUBECONFIG" not in env:
-        # fallback
-        env["KUBECONFIG"] = "/etc/rancher/k3s/k3s.yaml"
+        env["KUBECONFIG"] = DEFAULT_KUBECONFIG
+
+    if not Path(env["KUBECONFIG"]).exists():
+        print(f"WARNING: KUBECONFIG not found at {env['KUBECONFIG']}")
     
     return subprocess.run(["kubectl"] + cmd_args, text=True, env=env,
                           stdout=subprocess.PIPE if capture_output else subprocess.DEVNULL,
-                          stderr=subprocess.DEVNULL, check=check,
+                          stderr=subprocess.PIPE, 
+                          check=check,
                           input=input_bytes)
 
 # runs kubectl and returns the clean stdout string or None if the command fails
@@ -134,12 +163,22 @@ class PodOrchestrator:
 
     # attempts to load previous results from json to allow resuming from where you left off
     def _load_checkpoint(self):
-        if os.path.exists(self.results_file):
-            try:
-                return json.load(open(self.results_file))
-            except:
-                print("   [checkpoint] file corrupted, starting over")
-        return {} # worst case scenario: may return an empty dict if missing/corrupted
+        if not os.path.exists(self.results_file):
+            return {}
+        
+        try:
+            with open(self.results_file, "r") as f:
+                return json.load(f)
+        except json.JSONDecodeError as e:
+            print(f"   [checkpoint] file corrupted (JSON error): {e}")
+            backup_name = f"{self.results_file}.bak"
+            os.rename(self.results_file, backup_name)
+            print(f"   [checkpoint] corrupted file moved to {backup_name}")
+        except OSError as e:
+            print(f"   [checkpoint] OS error loading file: {e}")
+
+        return {}
+        
 
     # dumps the currently gathered results to the json file (after every trial)
     def _save_checkpoint(self):
@@ -148,6 +187,8 @@ class PodOrchestrator:
 
     # constructs the pod manifest dict, configuring name, image, args and resources
     def create_pod_yaml(self, pod_name, size, duration, warmup):
+        cpu_val = self.args.cpu
+        mem_val = self.args.memory
         pod_spec = {
             "restartPolicy": "Never",
             "containers": [{
@@ -156,8 +197,8 @@ class PodOrchestrator:
                 "imagePullPolicy": "Never",
                 "args": ["w" if warmup else "nw", str(size), str(duration)],
                 "resources": {
-                    "requests": {"cpu": "1000m", "memory": "1024Mi"},
-                    "limits":   {"cpu": "1000m", "memory": "1024Mi"}
+                    "requests": {"cpu": cpu_val, "memory": mem_val},
+                    "limits":   {"cpu": cpu_val, "memory": mem_val}
                 }
             }]
         }
@@ -259,12 +300,10 @@ class PodOrchestrator:
                     
                     if dt > 0 and prev_cpu is not None:
                         diff = cpu - prev_cpu
-                        # Υπολογισμός CPU cores
                         cpu_cores.append((diff / dt) / 1_000_000)
 
             if not mem_values: return None, "No valid metrics"
             
-            # --- ΟΙ ΓΡΑΜΜΕΣ ΠΟΥ ΕΛΕΙΠΑΝ ---
             cold_start = phases["running_time"] - phases["start"]
             throttled_events = (throttled_list[-1] - throttled_list[0]) if len(throttled_list) > 1 else 0
 
@@ -272,12 +311,80 @@ class PodOrchestrator:
                 "peak_mem_bytes": max(mem_values),
                 "avg_mem_bytes": sum(mem_values)/len(mem_values),
                 "avg_cpu_cores": sum(cpu_cores)/len(cpu_cores) if cpu_cores else 0,
-                "cold_start_time": cold_start,      # Τώρα υπάρχει!
-                "throttled_events": throttled_events # Και αυτό!
+                "cold_start_time": cold_start,
+                "throttled_events": throttled_events
             }, None
 
+    # handles log streaming and monitoring sync
+    def _execute_benchmark(self, pod_name, env, cgroup, stop_event, samples, phase_ts):
+        monitor_started = False
+        t_mon = threading.Thread(target=self.monitor_cgroup, args=(cgroup, self.args.interval, stop_event, samples))
+        print("   streaming logs...")
+        stdout_lines = []
+
+        proc = subprocess.Popen(
+            ["kubectl", "logs", "-f", pod_name, "-n", self.args.ns],
+            stdout=subprocess.PIPE, text=True, env=env
+        )
+
+        try:
+            for line in iter(proc.stdout.readline, ''):
+                print(f"   [pod] {line.strip()}")
+                stdout_lines.append(line)
+
+                if "BENCH_START" in line and not monitor_started:
+                    phase_ts["bench_start"] = time.time()
+                    t_mon.start()
+                    monitor_started = True
+                    print("   [monitor] STARTED")
+
+                if "BENCH_END" in line and monitor_started:
+                    phase_ts["end"] = time.time()
+                    stop_event.set()
+                    print("   [monitor] STOPPED (waiting for final metrics...)")
+                    proc.wait()
+            
+            
+        finally:
+            if monitor_started:
+                stop_event.set()
+                if t_mon.is_alive():
+                    t_mon.join()
+        
+        return "".join(stdout_lines)
+
+    # handles parsing, metrics calculation and saving
+    def _process_and_save_results(self, trial_idx, matrix_size, suffix, phase_ts, raw_output, samples):
+        parsed = self.parse_output(raw_output)
+        trial_entry = {
+            "trial": trial_idx,
+            "phases": phase_ts,
+            "parsed_metrics": parsed,
+            "samples": samples
+        }
+
+        additional, _ = self.compute_additional_metrics(trial_entry)
+        if additional:
+            trial_entry["additional_metrics"] = additional
+        
+        key = f"{matrix_size}_{suffix}"
+        if key not in self.results:
+            self.results[key] = []
+
+        self.results[key].append(trial_entry)
+        self._save_checkpoint()
+
+    # handles full pod cleanup after the trial, so that there arent any conflicts at the next one
+    def _cleanup_pod(self, pod_name, env):
+        print("   cleanup...")
+        kubectl(["delete", "pod", pod_name, "-n", self.args.ns, "--grace-period=0", "--force"], env=env)
+        for _ in range(15):
+            if not kubectl_pod_exists(pod_name, self.args.ns, env):
+                break
+            time.sleep(1)
+
+
     # the big guns. orchestrates a single experiment
-    # deploys pod, streams logs to synchronise monitoring and saves results
     def run_trial(self, trial_idx, matrix_size, warmup):
         suffix = 'w' if warmup else 'nw'
         pod_name = f"bench-{self.args.runtime_class}-{matrix_size}-{trial_idx}-{suffix}"
@@ -287,79 +394,23 @@ class PodOrchestrator:
         manifest = self.create_pod_yaml(pod_name, matrix_size, self.args.duration, warmup)
         phase_ts = {"start": time.time()}
 
-        # monitoring flags
-        monitor_started = False
-        stop_event = threading.Event()
-        t_mon = None
-        samples = []
-
         try:
             uid, cgroup, running_time = self.prepare_pod(pod_name, manifest, env)
             phase_ts["running_time"] = running_time
             
-            # prepare the thread but dont run it yet!
-            t_mon = threading.Thread(target=self.monitor_cgroup, args=(cgroup, self.args.interval, stop_event, samples))
+            stop_event = threading.Event()
+            samples = []
+            raw_output = self._execute_benchmark(pod_name, env, cgroup, stop_event, samples, phase_ts)
 
-            print("   streaming logs...")
-            stdout_lines = []
-            
-            proc = subprocess.Popen(["kubectl", "logs", "-f", pod_name, "-n", self.args.ns], 
-                                    stdout=subprocess.PIPE, text=True, env=env)
-            
-            # read loop !
-            for line in iter(proc.stdout.readline, ''):
-                print(f"   [pod] {line.strip()}")
-                stdout_lines.append(line)
-                
-                # 1. start monitoring when the signal arrives
-                if "BENCH_START" in line and not monitor_started:
-                    phase_ts["bench_start"] = time.time()
-                    t_mon.start()
-                    monitor_started = True
-                    print("   [monitor] STARTED (Main Loop)")
-
-                # 2. end monitoring the same way
-                if "BENCH_END" in line and monitor_started:
-                    phase_ts["end"] = time.time()
-                    stop_event.set()
-                    t_mon.join()
-                    print("   [monitor] STOPPED (Main Loop Ended)")
-                    # no break! there are more results to be read
-
-            proc.wait()
-            
-            # some safety: if there was no BENCH_END, close the thread
-            if monitor_started and t_mon.is_alive():
-                stop_event.set()
-                t_mon.join()
-
-            # save results
-            parsed = self.parse_output("".join(stdout_lines))
-            trial_entry = {"trial": trial_idx, "phases": phase_ts, "parsed_metrics": parsed, "samples": samples}
-            
-            additional, reason = self.compute_additional_metrics(trial_entry)
-            if additional:
-                trial_entry["additional_metrics"] = additional
-            
-            key = f"{matrix_size}_{suffix}"
-            if key not in self.results: self.results[key] = []
-            self.results[key].append(trial_entry)
-            self._save_checkpoint()
+            self._process_and_save_results(trial_idx, matrix_size, suffix, phase_ts, raw_output, samples)
             print("   trial saved.")
+
 
         except Exception as e:
             print(f"   [error] trial failed: {e}")
-            # safety cleanup (i hope this never happens)
-            if t_mon and t_mon.is_alive():
-                stop_event.set()
-                t_mon.join()
         
         finally:
-            print("   cleanup...")
-            kubectl(["delete", "pod", pod_name, "-n", self.args.ns, "--grace-period=0", "--force"], env=env)
-            for _ in range(15):
-                if not kubectl_pod_exists(pod_name, self.args.ns, env): break
-                time.sleep(1)
+            self._cleanup_pod(pod_name, env)
 
     # quick console report showing completion status
     def print_summary(self):
@@ -388,6 +439,8 @@ if __name__ == "__main__":
     parser.add_argument("--interval", type=float, default=1.0)
     parser.add_argument("--warmup", action='store_true')
     parser.add_argument("--kubeconfig", default=None, help="Optional path to KUBECONFIG")
+    parser.add_argument("--cpu", default="1000m")
+    parser.add_argument("--memory", default="1024Mi")
     args = parser.parse_args()
 
     # custom kubeconfig support (goes to the helpers via env)

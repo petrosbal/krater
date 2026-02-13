@@ -70,22 +70,23 @@ int main(int argc, char *argv[]) {
     }
 
     // actual benchmark
-    printf("BENCH_START\n"); fflush(stdout);
+    printf("BENCH_START\n"); fflush(stdout); // DO NOT TOUCH. seb script needs it
     struct timespec t_start, t_now;
     timespec_get(&t_start, TIME_UTC);
     double elapsed = 0.0;
     int iterations = 0;
 
     while (elapsed < duration) {
-        matrix_mult(A,B,C,N);
+        matrix_mult(A,B,C,N); //this is where you can change the workload
         iterations++;
         timespec_get(&t_now, TIME_UTC);
         elapsed = (t_now.tv_sec - t_start.tv_sec) + (t_now.tv_nsec - t_start.tv_nsec)/1e9;
     }
-    printf("BENCH_END\n"); fflush(stdout);
+    printf("BENCH_END\n"); fflush(stdout); // DO NOT TOUCH as well. same reason
 
     double mflops = 2.0 * N * N * N * iterations / elapsed / 1e6; // 2*N^3 flops per matrix multiplication
 
+    //this printf gets parsed wth regex and changing anything could mess up the benchmark results of the script.
     printf("\niterations: %d\nelapsed time: %.6f s\nthroughput: %.2f MFLOPS\ncalculation check: %s\n\n",
         iterations,
         elapsed,

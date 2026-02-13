@@ -1,11 +1,11 @@
 # bench_config.yaml
 environments:
-  - image: mmb-debian:latest
-    runtime_class: default
-
-  - image: mmb-static:latest
-    runtime_class: default
-
+#  - image: mmb-debian:latest
+#    runtime_class: default
+#
+ # - image: mmb-static:latest
+  #  runtime_class: default
+#
   - image: mmb-wasm:latest
     runtime_class: wasmtime
 
