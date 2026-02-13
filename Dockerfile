@@ -1,6 +1,6 @@
-# =================
+# -----------------
 # INTERNAL BUILDERS
-# =================
+# -----------------
 
 # -- C builder (native & static) --
 FROM debian:bullseye-slim AS builder-c
@@ -20,9 +20,9 @@ COPY ./src/mmb.c .
 RUN $CC -O3 -o mmb.wasm mmb.c -lm
 
 
-# ============
+# ------------
 # FINAL IMAGES
-# ============
+# ------------
 
 # ---------------------------------------------------------
 # 1. DEBIAN DCI
