@@ -9,101 +9,79 @@ import yaml
 
 class CgroupHandler:
     
-    # stores pod uid, hunts down cgroup path to prepare for monitoring
-    def __init__(self, pod_uid, custom_root = None):
-        self.pod_uid = pod_uid
-        self.uid_underscore = pod_uid.replace("-", "_")
-        self.search_roots = [custom_root] if custom_root else ["/sys/fs/cgroup/kubepods.slice", "/sys/fs/cgroup"]
+    def __init__(self, pod_name, namespace):
         self.path = None
-        self._find_path()
+        self._find_path(pod_name, namespace)
 
-    # finds location of cpu and ram usage for the running pod
-    def _find_path(self):
-        targets = [f"pod{self.pod_uid}", f"pod{self.uid_underscore}"]
-        found_paths = []
-        
-        for root_str in self.search_roots:
-            root_path = Path(root_str)
-            if not root_path.exists():
-                continue
+    # determines the exact cgroup path for a running container.
+    # approach: ask containerd for the host PID via its task table (runtime agnostic!)
+    # then read /proc/<pid>/cgroup directly.
+    def _find_path(self, pod_name, namespace):
+        # first get the container ID from the pod status
+        container_id_raw = kubectl_output(["get", "pod", pod_name, "-n", namespace,
+                                           "-o", "jsonpath={.status.containerStatuses[0].containerID}"])
+        if not container_id_raw:
+            raise RuntimeError(f"Could not get container ID for pod {pod_name}")
+        container_id = container_id_raw.removeprefix("containerd://")
 
-            for path in root_path.rglob("*"):
-                if any(t in path.name for t in targets):
-                    if (path / "cpu.stat").exists() or (path / "cpu.acct.usage()").exists():
-                        found_paths.append(path)
-                        
-        if not found_paths:
-                    raise RuntimeError(f"Cgroup path for pod {self.pod_uid} not found")
+        # then get the host PID from containerd's task table.
+        # k3s ctr queries containerd directly
+        # and the shim should report the PID regardless of what each runtime does with cgroups
+        result = subprocess.run(["k3s", "ctr", "-n", "k8s.io", "tasks", "ls"],
+                                capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(f"k3s ctr tasks ls failed: {result.stderr.strip()}")
 
-        # choosing the correct path
-        # the pod-level cgroup is the one with the least depth
-        # because containers are subfolders in it
-        # horrible bug to fix
-        self.path = str(min(found_paths, key=lambda p: len(p.parts)))
-        
-        # determine version based on selected path
-        self.version = 2 if (Path(self.path) / "cgroup.controllers").exists() else 1
-        print(f"   [cgroup] Selected path: {self.path} (v{self.version})")
+        pid = None
+        for line in result.stdout.splitlines():
+            parts = line.split()
+            if parts and parts[0] == container_id:
+                pid = int(parts[1])
+                break
 
-    # captures a timestamped snapshot of the metrics by parsing files
-    # support cgroup v2 (certainly) and v1 (in theory)
+        if pid is None:
+            raise RuntimeError(f"Container {container_id[:12]} not found in containerd task list")
+
+        # finally, read the actual cgroup path from the kernel.
+        # /proc/<pid>/cgroup cannot lie about where the process is
+        # cgroup v2 format: "0::/path"
+        try:
+            with open(f"/proc/{pid}/cgroup") as f:
+                for line in f:
+                    if line.startswith("0::"):
+                        self.path = "/sys/fs/cgroup" + line.strip().removeprefix("0::")
+                        break
+        except FileNotFoundError:
+            raise RuntimeError(f"Process {pid} not found in /proc. container may have already exited")
+
+        if self.path is None:
+            raise RuntimeError(f"No cgroup v2 entry found in /proc/{pid}/cgroup")
+
+        print(f"   [cgroup] pid={pid}, path={self.path}")
+
+    # captures a timestamped snapshot of cgroup v2 metrics by parsing them directly from the relevant files
     def read_stats(self):
         ts = time.time()
         metrics = {"timestamp": ts}
         try:
-            if self.version == 2: #cgroup v2
-                # CPU usage, user, system, throttled
-                cpu_stat = os.path.join(self.path, "cpu.stat")
-                with open(cpu_stat) as f:
-                    for line in f:
-                        k, v = line.strip().split()
-                        if k in ["usage_usec", "user_usec", "system_usec", "nr_throttled"]:
-                            metrics[k] = int(v)
-                
-                # RAM
-                # 1. total usage (cache + RSS)
-                with open(os.path.join(self.path, "memory.current")) as f:
-                    metrics["mem_bytes"] = int(f.read().strip())
-                
-                # 2. RSS
-                with open(os.path.join(self.path, "memory.stat")) as f:
-                    for line in f:
-                        parts = line.split()
-                        if parts[0] == "anon":
-                            metrics["rss_bytes"] = int(parts[1])
-                            break
+            # cpu usage, user, system, throttled
+            with open(os.path.join(self.path, "cpu.stat")) as f:
+                for line in f:
+                    k, v = line.strip().split()
+                    if k in ["usage_usec", "user_usec", "system_usec", "nr_throttled"]:
+                        metrics[k] = int(v)
 
-            else: #cgroup v1
-                # CPU
-                cpu_file = os.path.join(self.path, "cpuacct.usage")
-                if os.path.exists(cpu_file):
-                    # ns -> usec for compatibility
-                    metrics["usage_usec"] = int(open(cpu_file).read().strip()) / 1000
-                
-                # system CPU
-                stat_file = os.path.join(self.path, "cpuacct.stat")
-                if os.path.exists(stat_file):
-                    with open(stat_file) as f:
-                        for line in f:
-                            parts = line.split()
-                            if parts[0] == "system":
-                                # Υποθέτουμε 100Hz (1 tick = 10ms = 10000usec)
-                                metrics["system_usec"] = int(parts[1]) * 10000
+            # ram: total usage (cache + RSS)
+            with open(os.path.join(self.path, "memory.current")) as f:
+                metrics["mem_bytes"] = int(f.read().strip())
 
-                # RAM (cache + rss)
-                mem_file = os.path.join(self.path, "memory.usage_in_bytes")
-                if os.path.exists(mem_file):
-                    metrics["mem_bytes"] = int(open(mem_file).read().strip())
-                
-                # rss
-                mem_stat = os.path.join(self.path, "memory.stat")
-                if os.path.exists(mem_stat):
-                    with open(mem_stat) as f:
-                        for line in f:
-                            parts = line.split()
-                            if parts[0] == "rss":
-                                metrics["rss_bytes"] = int(parts[1])
-                                break
+            # ram: RSS (anonymous memory only)
+            with open(os.path.join(self.path, "memory.stat")) as f:
+                for line in f:
+                    parts = line.split()
+                    if parts[0] == "anon":
+                        metrics["rss_bytes"] = int(parts[1])
+                        break
 
         except FileNotFoundError as e:
             print(f"   [cgroup] file not found during read: {e.filename}")
@@ -156,9 +134,8 @@ class PodOrchestrator:
     # prepares output dir and loads any existing checkpoint data
     def __init__(self, args):
         self.args = args
-        output_dir = "results"
-        os.makedirs(output_dir, exist_ok=True)
-        self.results_file = os.path.join(output_dir, os.path.basename(args.output))
+        self.results_file = args.output
+        os.makedirs(os.path.dirname(args.output) or ".", exist_ok=True)
         self.results = self._load_checkpoint()
 
     # attempts to load previous results from json to allow resuming from where you left off
@@ -262,7 +239,7 @@ class PodOrchestrator:
             if phase == "Failed": raise RuntimeError("Pod failed to start")
             time.sleep(0.5)
             
-        return uid, CgroupHandler(uid), running_time
+        return uid, CgroupHandler(pod_name, self.args.ns), running_time
 
     # polls cgroup stats and appends them in a list until main thread signals stop
     def monitor_cgroup(self, cgroup, interval, stop_event, samples):
