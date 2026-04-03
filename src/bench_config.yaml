@@ -15,14 +15,12 @@ environments:
   - image: mmb-wasm:latest
     runtime_class: wasmer
 
-  - image: mmb-wasm:latest
-    runtime_class: wamr
 
 shared_args:
-  sizes: [256, 512]
-  trials: 3
+  sizes: [256, 1024]
+  trials: 25
   duration: 30
   warmup: true
-  interval: 1.0
+  interval: 0.5
   namespace: default
-  results_subfolder_name: initial_bench
+  results_subfolder_name: test_bench
