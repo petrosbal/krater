@@ -17,12 +17,12 @@ def construct_command(script_path, shared_args, env_args):
     final_args = shared_args.copy()
     final_args.update(env_args)
 
-    # 2. remove non-script, orcehstrator-only arg
-    subfolder = final_args.pop('results_subfolder_name', 'results')
-    
+    # 2. remove non-script, orchestrator-only arg
+    subfolder = final_args.pop('results_subfolder_name')
+
     # 3. handle output dir & filename
-    # e.g. ./initial/mmb-debian_default.json
-    output_dir = Path(subfolder)
+    # e.g. results/test_bench/mmb-debian_default.json
+    output_dir = Path("results") / subfolder
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # clean the image name a bit (mmb-debian:latest -> mmb-debian)
