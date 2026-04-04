@@ -101,7 +101,9 @@ class CgroupHandler:
 
 
 from pathlib import Path
-DEFAULT_KUBECONFIG = os.environ.get("KUBECONFIG", "/etc/rancher/k3s/k3s.yaml")
+DEFAULT_KUBECONFIG   = os.environ.get("KUBECONFIG", "/etc/rancher/k3s/k3s.yaml")
+POD_UID_TIMEOUT      = 30  # seconds to wait for the pod UID to appear after apply
+POD_RUNNING_TIMEOUT  = 60  # seconds to wait for the container to reach Running/Succeeded
 
 # executes a kubectl command via subprocess, returns full process result
 def kubectl(cmd_args, env=None, capture_output=True, check=False, input_bytes=None):
@@ -221,7 +223,7 @@ class PodOrchestrator:
         uid = None
         start_wait = time.time()
         while uid is None:
-            if time.time() - start_wait > 30: raise TimeoutError("timed out waiting for UID")
+            if time.time() - start_wait > POD_UID_TIMEOUT: raise TimeoutError("timed out waiting for UID")
             uid = kubectl_output(["get","pod",pod_name,"-n",self.args.ns,"-o","jsonpath={.metadata.uid}"], env)
             time.sleep(0.5)
         print(f"   pod uid: {uid}") # PRINT KEPT
@@ -231,7 +233,7 @@ class PodOrchestrator:
         start_wait = time.time()
         phase = None
         while True:
-            if time.time() - start_wait > 60: raise TimeoutError("timed out waiting for Running state")
+            if time.time() - start_wait > POD_RUNNING_TIMEOUT: raise TimeoutError("timed out waiting for Running state")
             phase = kubectl_output(["get","pod",pod_name,"-n",self.args.ns,"-o","jsonpath={.status.phase}"], env)
             if phase in ("Running", "Succeeded"): break
             if phase == "Failed": raise RuntimeError("Pod failed to start")
