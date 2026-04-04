@@ -6,6 +6,7 @@ import threading
 import argparse
 import re
 import yaml
+from datetime import datetime, timezone
 
 class CgroupHandler:
     
@@ -228,17 +229,26 @@ class PodOrchestrator:
         # 4. wait for Running
         print("   waiting for container to start...") # PRINT KEPT
         start_wait = time.time()
-        running_time = None
+        phase = None
         while True:
             if time.time() - start_wait > 60: raise TimeoutError("timed out waiting for Running state")
             phase = kubectl_output(["get","pod",pod_name,"-n",self.args.ns,"-o","jsonpath={.status.phase}"], env)
-            if phase == "Running":
-                running_time = time.time()
-                break
-            if phase == "Succeeded": break 
+            if phase in ("Running", "Succeeded"): break
             if phase == "Failed": raise RuntimeError("Pod failed to start")
             time.sleep(0.5)
-            
+
+        # get the exact container start time from the runtime rather than relying on when
+        # our polling loop happened to observe the transition (which would be up to 0.5s off)
+        if phase == "Running":
+            ts_path = "jsonpath={.status.containerStatuses[0].state.running.startedAt}"
+        else:
+            ts_path = "jsonpath={.status.containerStatuses[0].state.terminated.startedAt}"
+
+        ts_raw = kubectl_output(["get","pod",pod_name,"-n",self.args.ns,"-o",ts_path], env)
+        if not ts_raw:
+            raise RuntimeError(f"could not get container startedAt timestamp for pod {pod_name}")
+        running_time = datetime.fromisoformat(ts_raw.replace("Z", "+00:00")).timestamp()
+
         return uid, CgroupHandler(pod_name, self.args.ns), running_time
 
     # polls cgroup stats and appends them in a list until main thread signals stop
@@ -254,7 +264,7 @@ class PodOrchestrator:
             phases = trial_entry.get("phases", {})
             
             if not samples: return None, "No cgroup samples"
-            if "running_time" not in phases or "start" not in phases:
+            if phases.get("running_time") is None or phases.get("start") is None:
                 return None, "Running/start timestamps missing"
             
             mem_values = []
