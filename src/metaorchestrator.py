@@ -12,6 +12,34 @@ def load_config(path):
     with open(path, 'r') as f:
         return yaml.safe_load(f)
 
+def validate_config(config):
+    errors = []
+
+    envs = config.get("environments")
+    if not isinstance(envs, list) or not envs:
+        errors.append("'environments' must be a non-empty list")
+    else:
+        for i, env in enumerate(envs):
+            if not isinstance(env, dict):
+                errors.append(f"environments[{i}] must be a mapping")
+                continue
+            for key in ("image", "runtime_class"):
+                if key not in env:
+                    errors.append(f"environments[{i}] missing required key: '{key}'")
+
+    shared = config.get("shared_args")
+    if not isinstance(shared, dict):
+        errors.append("'shared_args' must be a mapping")
+    elif "results_subfolder_name" not in shared:
+        errors.append("shared_args missing required key: 'results_subfolder_name'")
+
+    if errors:
+        print("Config validation failed:")
+        for e in errors:
+            print(f"  - {e}")
+        return False
+    return True
+
 def construct_command(script_path, shared_args, env_args):
     # 1. Merge arguments
     final_args = shared_args.copy()
@@ -65,6 +93,8 @@ def run():
         return
 
     config = load_config(YAML_FILE)
+    if not validate_config(config):
+        return
     environments = config.get('environments', [])
     shared_args = config.get('shared_args', {})
 
