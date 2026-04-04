@@ -102,13 +102,13 @@ def run():
     
     for i, env in enumerate(environments, 1):
         print(f"\n{'='*60}")
-        print(f"[Run {i}/{len(environments)}] Image: {env.get('image')} | Runtime: {env.get('runtime_class')}")
+        print(f"[run {i}/{len(environments)}] image: {env.get('image')} | runtime: {env.get('runtime_class')}")
         
         try:
             cmd = construct_command(SCRIPT_NAME, shared_args, env)
             subprocess.run(cmd, check=True)
             
-            print(f"SUCCESS!")
+            print(f"done.")
 
         except subprocess.CalledProcessError as e:
             print(f"Failed with exit code {e.returncode}. Aborting {env} env, moving to the next one.")

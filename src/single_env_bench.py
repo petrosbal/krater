@@ -113,7 +113,7 @@ def kubectl(cmd_args, env=None, capture_output=True, check=False, input_bytes=No
         env["KUBECONFIG"] = DEFAULT_KUBECONFIG
 
     if not Path(env["KUBECONFIG"]).exists():
-        print(f"WARNING: KUBECONFIG not found at {env['KUBECONFIG']}")
+        print(f"   [kubectl] warning: KUBECONFIG not found at {env['KUBECONFIG']}")
     
     return subprocess.run(["kubectl"] + cmd_args, text=True, env=env,
                           stdout=subprocess.PIPE if capture_output else subprocess.DEVNULL,
@@ -220,21 +220,21 @@ class PodOrchestrator:
         time.sleep(2)
 
         # 2. launch
-        print("   launching pod...") # PRINT KEPT
+        print("   launching pod...")
         kubectl(["apply","-f","-"], env=env, check=True, capture_output=False, input_bytes=yaml.dump(manifest))
 
         # 3. wait for UID
-        print("   waiting for pod uid...") # PRINT KEPT
+        print("   waiting for pod uid...")
         uid = None
         start_wait = time.time()
         while uid is None:
             if time.time() - start_wait > POD_UID_TIMEOUT: raise TimeoutError("timed out waiting for UID")
             uid = kubectl_output(["get","pod",pod_name,"-n",self.args.ns,"-o","jsonpath={.metadata.uid}"], env)
             time.sleep(0.5)
-        print(f"   pod uid: {uid}") # PRINT KEPT
+        print(f"   pod uid: {uid}")
 
         # 4. wait for Running
-        print("   waiting for container to start...") # PRINT KEPT
+        print("   waiting for container to start...")
         start_wait = time.time()
         phase = None
         while True:
@@ -347,7 +347,7 @@ class PodOrchestrator:
         finally:
             watchdog.cancel()
             if "end" not in phase_ts:
-                print(f"   [warning] log stream ended without BENCH_END (timeout or crash)")
+                print(f"   [stream] warning: ended without BENCH_END (timeout or crash)")
             if monitor_started:
                 stop_event.set()
                 if t_mon.is_alive():
@@ -380,7 +380,7 @@ class PodOrchestrator:
 
     # handles full pod cleanup after the trial, so that there arent any conflicts at the next one
     def _cleanup_pod(self, pod_name, env):
-        print("   cleanup...")
+        print("   [cleanup] starting...")
         kubectl(["delete", "pod", pod_name, "-n", self.args.ns, "--grace-period=0", "--force"], env=env)
         for _ in range(15):
             if not kubectl_pod_exists(pod_name, self.args.ns, env):
@@ -413,7 +413,7 @@ class PodOrchestrator:
 
 
         except Exception as e:
-            print(f"   [error] trial failed: {e}")
+            print(f"   [trial] error: {e}")
         
         finally:
             try:
