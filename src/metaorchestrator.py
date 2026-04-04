@@ -12,6 +12,16 @@ def load_config(path):
     with open(path, 'r') as f:
         return yaml.safe_load(f)
 
+REQUIRED_SHARED_KEYS = (
+    "results_subfolder_name",
+    "sizes",
+    "trials",
+    "duration",
+    "warmup",
+    "interval",
+    "namespace",
+)
+
 def validate_config(config):
     errors = []
 
@@ -30,8 +40,10 @@ def validate_config(config):
     shared = config.get("shared_args")
     if not isinstance(shared, dict):
         errors.append("'shared_args' must be a mapping")
-    elif "results_subfolder_name" not in shared:
-        errors.append("shared_args missing required key: 'results_subfolder_name'")
+    else:
+        for key in REQUIRED_SHARED_KEYS:
+            if key not in shared:
+                errors.append(f"shared_args missing required key: '{key}'")
 
     if errors:
         print("Config validation failed:")
@@ -65,10 +77,7 @@ def construct_command(script_path, shared_args, env_args):
     cmd = [PYTHON_EXEC, script_path]
 
     for key, value in final_args.items():
-        if key == "namespace":
-            arg_flag = "--ns"
-        else:
-            arg_flag = f"--{key}"
+        arg_flag = f"--{key}"
 
         if isinstance(value, bool):
             # boolean (flags): either include the flag or not (for the warmup one)

@@ -190,7 +190,7 @@ class PodOrchestrator:
         if self.args.runtime_class != "default":
             pod_spec["runtimeClassName"] = self.args.runtime_class
         return {"apiVersion": "v1", "kind": "Pod",
-                "metadata": {"name": pod_name, "namespace": self.args.ns},
+                "metadata": {"name": pod_name, "namespace": self.args.namespace},
                 "spec": pod_spec}
 
     # scrapes the container logs with regex to get metrics from the benchmark itself
@@ -216,7 +216,7 @@ class PodOrchestrator:
     # maybe it does too much. clears stale instances, deploys new pod, polls the api
     def prepare_pod(self, pod_name, manifest, env):
         # 1. cleanup
-        kubectl(["delete","pod",pod_name,"-n",self.args.ns,"--grace-period=0","--force"], env=env, capture_output=False)
+        kubectl(["delete","pod",pod_name,"-n",self.args.namespace,"--grace-period=0","--force"], env=env, capture_output=False)
         time.sleep(2)
 
         # 2. launch
@@ -229,7 +229,7 @@ class PodOrchestrator:
         start_wait = time.time()
         while uid is None:
             if time.time() - start_wait > POD_UID_TIMEOUT: raise TimeoutError("timed out waiting for UID")
-            uid = kubectl_output(["get","pod",pod_name,"-n",self.args.ns,"-o","jsonpath={.metadata.uid}"], env)
+            uid = kubectl_output(["get","pod",pod_name,"-n",self.args.namespace,"-o","jsonpath={.metadata.uid}"], env)
             time.sleep(0.5)
         print(f"   pod uid: {uid}")
 
@@ -239,7 +239,7 @@ class PodOrchestrator:
         phase = None
         while True:
             if time.time() - start_wait > POD_RUNNING_TIMEOUT: raise TimeoutError("timed out waiting for Running state")
-            phase = kubectl_output(["get","pod",pod_name,"-n",self.args.ns,"-o","jsonpath={.status.phase}"], env)
+            phase = kubectl_output(["get","pod",pod_name,"-n",self.args.namespace,"-o","jsonpath={.status.phase}"], env)
             if phase in ("Running", "Succeeded"): break
             if phase == "Failed": raise RuntimeError("Pod failed to start")
             time.sleep(0.5)
@@ -251,12 +251,12 @@ class PodOrchestrator:
         else:
             ts_path = "jsonpath={.status.containerStatuses[0].state.terminated.startedAt}"
 
-        ts_raw = kubectl_output(["get","pod",pod_name,"-n",self.args.ns,"-o",ts_path], env)
+        ts_raw = kubectl_output(["get","pod",pod_name,"-n",self.args.namespace,"-o",ts_path], env)
         if not ts_raw:
             raise RuntimeError(f"could not get container startedAt timestamp for pod {pod_name}")
         running_time = datetime.fromisoformat(ts_raw.replace("Z", "+00:00")).timestamp()
 
-        return uid, CgroupHandler(pod_name, self.args.ns), running_time
+        return uid, CgroupHandler(pod_name, self.args.namespace), running_time
 
     # polls cgroup stats and appends them in a list until main thread signals stop
     def monitor_cgroup(self, cgroup, interval, stop_event, samples):
@@ -317,7 +317,7 @@ class PodOrchestrator:
         stdout_lines = []
 
         proc = subprocess.Popen(
-            ["kubectl", "logs", "-f", pod_name, "-n", self.args.ns],
+            ["kubectl", "logs", "-f", pod_name, "-n", self.args.namespace],
             stdout=subprocess.PIPE, text=True, env=env
         )
 
@@ -381,9 +381,9 @@ class PodOrchestrator:
     # handles full pod cleanup after the trial, so that there arent any conflicts at the next one
     def _cleanup_pod(self, pod_name, env):
         print("   [cleanup] starting...")
-        kubectl(["delete", "pod", pod_name, "-n", self.args.ns, "--grace-period=0", "--force"], env=env)
+        kubectl(["delete", "pod", pod_name, "-n", self.args.namespace, "--grace-period=0", "--force"], env=env)
         for _ in range(15):
-            if not kubectl_pod_exists(pod_name, self.args.ns, env):
+            if not kubectl_pod_exists(pod_name, self.args.namespace, env):
                 break
             time.sleep(1)
 
@@ -440,7 +440,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--image", required=True)
     parser.add_argument("--runtime_class", required=True)
-    parser.add_argument("--ns", default="default")
+    parser.add_argument("--namespace", default="default")
     parser.add_argument("--output", default="bench_results.json")
     parser.add_argument("--sizes", nargs='+', type=int, default=[512, 1024])
     parser.add_argument("--trials", type=int, default=5)
