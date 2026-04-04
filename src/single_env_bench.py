@@ -10,17 +10,17 @@ from datetime import datetime, timezone
 
 class CgroupHandler:
     
-    def __init__(self, pod_name, namespace):
+    def __init__(self, pod_name, namespace, env):
         self.path = None
-        self._find_path(pod_name, namespace)
+        self._find_path(pod_name, namespace, env)
 
     # determines the exact cgroup path for a running container.
     # approach: ask containerd for the host PID via its task table (runtime agnostic!)
     # then read /proc/<pid>/cgroup directly.
-    def _find_path(self, pod_name, namespace):
+    def _find_path(self, pod_name, namespace, env):
         # first get the container ID from the pod status
         container_id_raw = kubectl_output(["get", "pod", pod_name, "-n", namespace,
-                                           "-o", "jsonpath={.status.containerStatuses[0].containerID}"])
+                                           "-o", "jsonpath={.status.containerStatuses[0].containerID}"], env)
         if not container_id_raw:
             raise RuntimeError(f"Could not get container ID for pod {pod_name}")
         container_id = container_id_raw.removeprefix("containerd://")
@@ -256,7 +256,7 @@ class PodOrchestrator:
             raise RuntimeError(f"could not get container startedAt timestamp for pod {pod_name}")
         running_time = datetime.fromisoformat(ts_raw.replace("Z", "+00:00")).timestamp()
 
-        return uid, CgroupHandler(pod_name, self.args.namespace), running_time
+        return uid, CgroupHandler(pod_name, self.args.namespace, env), running_time
 
     # polls cgroup stats and appends them in a list until main thread signals stop
     def monitor_cgroup(self, cgroup, interval, stop_event, samples):
