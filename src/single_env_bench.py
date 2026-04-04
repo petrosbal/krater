@@ -319,14 +319,14 @@ class PodOrchestrator:
                     phase_ts["end"] = time.time()
                     stop_event.set()
                     print("   [monitor] STOPPED (waiting for final metrics...)")
-                    proc.wait()
-            
-            
+
         finally:
             if monitor_started:
                 stop_event.set()
                 if t_mon.is_alive():
                     t_mon.join()
+            proc.terminate()
+            proc.communicate()
         
         return "".join(stdout_lines)
 
