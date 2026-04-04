@@ -22,7 +22,7 @@ image-build: ## Build all variants and import to k3s (requires sudo)
 
 k3s-import:
 	@echo "Importing to k3s..."
-	docker save $(IMAGES) | sudo k3s ctr images import -
+	bash -o pipefail -c 'docker save $(IMAGES) | sudo k3s ctr images import -'
 
 reset: ## Remove built images from local storage and k3s
 	docker rmi -f $(IMAGES) || true

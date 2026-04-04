@@ -76,7 +76,6 @@ def run():
         
         try:
             cmd = construct_command(SCRIPT_NAME, shared_args, env)
-            #print(f"DEBUG CMD: {' '.join(cmd)}") 
             subprocess.run(cmd, check=True)
             
             print(f"SUCCESS!")
