@@ -28,7 +28,7 @@ reset: ## Remove built images from local storage and k3s
 	docker rmi -f $(IMAGES) || true
 	sudo k3s ctr images rm $(addprefix docker.io/library/,$(IMAGES)) || true
 
-hard-reset: reset ## Remove everything including Dockerfile-generated build tools
+hard-reset: reset results-clean ## Remove everything including Dockerfile-generated build tools and results
 	docker rmi -f $(BUILD_TOOLS) || true
 	docker image prune -f
 
