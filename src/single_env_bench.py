@@ -399,7 +399,10 @@ class PodOrchestrator:
             print(f"   [error] trial failed: {e}")
         
         finally:
-            self._cleanup_pod(pod_name, env)
+            try:
+                self._cleanup_pod(pod_name, env)
+            except Exception as e:
+                print(f"   [cleanup] failed: {e}")
 
     # quick console report showing completion status
     def print_summary(self):
