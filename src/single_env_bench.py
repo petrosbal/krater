@@ -368,6 +368,8 @@ class PodOrchestrator:
         print(f"\n--- trial {trial_idx}: {pod_name} (size={matrix_size}) ---")
 
         env = os.environ.copy()
+        if "KUBECONFIG" not in env:
+            env["KUBECONFIG"] = DEFAULT_KUBECONFIG
         manifest = self.create_pod_yaml(pod_name, matrix_size, self.args.duration, warmup)
         phase_ts = {"start": time.time()}
 
@@ -415,14 +417,9 @@ if __name__ == "__main__":
     parser.add_argument("--duration", type=float, default=10.0)
     parser.add_argument("--interval", type=float, default=1.0)
     parser.add_argument("--warmup", action='store_true')
-    parser.add_argument("--kubeconfig", default=None, help="Optional path to KUBECONFIG")
     parser.add_argument("--cpu", default="1000m")
     parser.add_argument("--memory", default="1024Mi")
     args = parser.parse_args()
-
-    # custom kubeconfig support (goes to the helpers via env)
-    if args.kubeconfig:
-        os.environ["KUBECONFIG_PATH"] = args.kubeconfig
 
     # cgroup access needs root. force sudo
     if os.geteuid() != 0:
