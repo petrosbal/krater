@@ -104,6 +104,7 @@ from pathlib import Path
 DEFAULT_KUBECONFIG   = os.environ.get("KUBECONFIG", "/etc/rancher/k3s/k3s.yaml")
 POD_UID_TIMEOUT      = 30  # seconds to wait for the pod UID to appear after apply
 POD_RUNNING_TIMEOUT  = 60  # seconds to wait for the container to reach Running/Succeeded
+LOG_STREAM_OVERHEAD  = 30  # seconds added on top of benchmark duration as timeout for log streaming
 
 # executes a kubectl command via subprocess, returns full process result
 def kubectl(cmd_args, env=None, capture_output=True, check=False, input_bytes=None):
@@ -320,6 +321,13 @@ class PodOrchestrator:
             stdout=subprocess.PIPE, text=True, env=env
         )
 
+        # if BENCH_END never appears (mmb.c crash, runtime hang, API server gone),
+        # readline blocks forever. kill kubectl after a generous deadline so the
+        # trial fails cleanly instead of freezing the whole run.
+        timeout = self.args.duration + LOG_STREAM_OVERHEAD
+        watchdog = threading.Timer(timeout, proc.terminate)
+        watchdog.start()
+
         try:
             for line in iter(proc.stdout.readline, ''):
                 print(f"   [pod] {line.strip()}")
@@ -337,13 +345,16 @@ class PodOrchestrator:
                     print("   [monitor] STOPPED (waiting for final metrics...)")
 
         finally:
+            watchdog.cancel()
+            if "end" not in phase_ts:
+                print(f"   [warning] log stream ended without BENCH_END (timeout or crash)")
             if monitor_started:
                 stop_event.set()
                 if t_mon.is_alive():
                     t_mon.join()
             proc.terminate()
             proc.communicate()
-        
+
         return "".join(stdout_lines)
 
     # handles parsing, metrics calculation and saving
