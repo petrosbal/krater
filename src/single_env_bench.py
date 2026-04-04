@@ -161,9 +161,13 @@ class PodOrchestrator:
         
 
     # dumps the currently gathered results to the json file (after every trial)
+    # write to a temp file first, then atomically replace the real one.
+    # if we get killed mid-write the original results file stays intact.
     def _save_checkpoint(self):
-        with open(self.results_file, "w") as f:
+        tmp = self.results_file + ".tmp"
+        with open(tmp, "w") as f:
             json.dump(self.results, f, indent=2)
+        os.replace(tmp, self.results_file)
 
     # constructs the pod manifest dict, configuring name, image, args and resources
     def create_pod_yaml(self, pod_name, size, duration, warmup):
