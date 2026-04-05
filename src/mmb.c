@@ -50,7 +50,10 @@ int main(int argc, char *argv[]) {
     double *A = malloc(N*N*sizeof(double));
     double *B = malloc(N*N*sizeof(double));
     double *C = malloc(N*N*sizeof(double));
-    if (!A || !B || !C) return 1;
+    if (!A || !B || !C) {
+        fprintf(stderr, "error: malloc failed for N=%d\n", N);
+        return 1;
+    }
 
     for (int i=0;i<N*N;i++) {
         A[i] = VAL_A; B[i] = VAL_B;
