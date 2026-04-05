@@ -23,4 +23,6 @@ shared_args:
   warmup: true
   interval: 0.5
   namespace: default
+  cpu: "1000m"
+  memory: "1024Mi"
   results_subfolder_name: test_bench

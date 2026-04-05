@@ -1,7 +1,6 @@
 import yaml
 import subprocess
 import sys
-import os
 from pathlib import Path
 
 YAML_FILE = "src/bench_config.yaml"
@@ -12,7 +11,7 @@ def load_config(path):
     with open(path, 'r') as f:
         return yaml.safe_load(f)
 
-REQUIRED_SHARED_KEYS = (
+REQUIRED_SHARED_KEYS = frozenset({
     "results_subfolder_name",
     "sizes",
     "trials",
@@ -20,36 +19,50 @@ REQUIRED_SHARED_KEYS = (
     "warmup",
     "interval",
     "namespace",
-)
+    "cpu",
+    "memory",
+})
+
+REQUIRED_ENV_KEYS = frozenset({"image", "runtime_class"})
 
 def validate_config(config):
-    errors = []
+    # top-level structure
+    if not isinstance(config, dict):
+        print("YAML error: config is empty or not a valid mapping")
+        return False
 
+    # environments: must be a non-empty list of valid entries
     envs = config.get("environments")
     if not isinstance(envs, list) or not envs:
-        errors.append("'environments' must be a non-empty list")
-    else:
-        for i, env in enumerate(envs):
-            if not isinstance(env, dict):
-                errors.append(f"environments[{i}] must be a mapping")
-                continue
-            for key in ("image", "runtime_class"):
-                if key not in env:
-                    errors.append(f"environments[{i}] missing required key: '{key}'")
+        print("YAML error: 'environments' must be a non-empty list")
+        return False
 
+    for i, env in enumerate(envs):
+        if not isinstance(env, dict):
+            print(f"YAML error: environments[{i}] must be a mapping")
+            return False
+        env_keys = set(env)
+        if missing := REQUIRED_ENV_KEYS - env_keys:
+            print(f"YAML error: environments[{i}] missing required keys: {', '.join(sorted(missing))}")
+            return False
+        if unknown := env_keys - REQUIRED_ENV_KEYS:
+            print(f"YAML error: environments[{i}] has unknown keys: {', '.join(sorted(unknown))}")
+            return False
+
+    # shared_args: must be a mapping with exactly the required keys
     shared = config.get("shared_args")
     if not isinstance(shared, dict):
-        errors.append("'shared_args' must be a mapping")
-    else:
-        for key in REQUIRED_SHARED_KEYS:
-            if key not in shared:
-                errors.append(f"shared_args missing required key: '{key}'")
-
-    if errors:
-        print("Config validation failed:")
-        for e in errors:
-            print(f"  - {e}")
+        print("YAML error: 'shared_args' must be a mapping")
         return False
+
+    shared_keys = set(shared)
+    if missing := REQUIRED_SHARED_KEYS - shared_keys:
+        print(f"YAML error: 'shared_args' missing required keys: {', '.join(sorted(missing))}")
+        return False
+    if unknown := shared_keys - REQUIRED_SHARED_KEYS:
+        print(f"YAML error: 'shared_args' has unknown keys: {', '.join(sorted(unknown))}")
+        return False
+
     return True
 
 def construct_command(script_path, shared_args, env_args):
@@ -66,8 +79,8 @@ def construct_command(script_path, shared_args, env_args):
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # clean the image name a bit (mmb-debian:latest -> mmb-debian)
-    safe_image_name = final_args.get('image', 'unknown').split(':')[0]
-    safe_runtime = final_args.get('runtime_class', 'default')
+    safe_image_name = final_args['image'].split(':')[0]
+    safe_runtime = final_args['runtime_class']
     output_filename = output_dir / f"{safe_image_name}_{safe_runtime}.json"
     
     # add output to dictionary to get processed by the loop later on
@@ -97,31 +110,31 @@ def construct_command(script_path, shared_args, env_args):
     return cmd
 
 def run():
-    if not os.path.exists(YAML_FILE):
+    if not Path(YAML_FILE).exists():
         print(f"Config file '{YAML_FILE}' not found.")
         return
 
-    config = load_config(YAML_FILE)
+    try:
+        config = load_config(YAML_FILE)
+    except yaml.YAMLError as e:
+        print(f"YAML error: {e}")
+        return
     if not validate_config(config):
         return
-    environments = config.get('environments', [])
-    shared_args = config.get('shared_args', {})
+    print(f"Orchestrator started. Found {len(config['environments'])} environments.")
 
-    print(f"Orchestrator started. Found {len(environments)} environments.")
-    
-    for i, env in enumerate(environments, 1):
+    for i, env in enumerate(config['environments'], 1):
         print(f"\n{'='*60}")
-        print(f"[run {i}/{len(environments)}] image: {env.get('image')} | runtime: {env.get('runtime_class')}")
-        
+        print(f"[run {i}/{len(config['environments'])}] image: {env['image']} | runtime: {env['runtime_class']}")
+
         try:
-            cmd = construct_command(SCRIPT_NAME, shared_args, env)
+            cmd = construct_command(SCRIPT_NAME, config['shared_args'], env)
             subprocess.run(cmd, check=True)
-            
-            print(f"done.")
+
+            print("done.")
 
         except subprocess.CalledProcessError as e:
             print(f"Failed with exit code {e.returncode}. Aborting {env} env, moving to the next one.")
-            continue
         except Exception as e:
             print(f"Unexpected error: {e}")
             break
