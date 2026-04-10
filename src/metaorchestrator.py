@@ -1,6 +1,7 @@
 import yaml
 import subprocess
 import sys
+import re
 from pathlib import Path
 
 YAML_FILE = "src/bench_config.yaml"
@@ -72,15 +73,60 @@ def validate_config(config):
         print(f"YAML error: 'shared_args' has unknown keys: {', '.join(sorted(unknown))}")
         return False
 
-    return True
+    # value validation
+    duration = shared["duration"]
+    if not isinstance(duration, (int, float)) or isinstance(duration, bool) or duration <= 0:
+        print(f"YAML error: 'duration' must be a positive number, got {duration!r}")
+        return False
 
-def check_oom(sizes, memory_str):
-    limit = parse_memory_bytes(memory_str)
-    for n in sizes:
-        required = 3 * n * n * 8
-        if required > limit:
-            print(f"OOM: N={n} needs {required // 1024**2}Mi for matrix allocation alone, limit is {limit // 1024**2}Mi")
+    if not isinstance(shared["trials"], int) or isinstance(shared["trials"], bool) or shared["trials"] < 1:
+        print(f"YAML error: 'trials' must be an integer >= 1, got {shared['trials']!r}")
+        return False
+
+    if not isinstance(shared["warmup"], bool):
+        print(f"YAML error: 'warmup' must be a boolean, got {shared['warmup']!r}")
+        return False
+
+    interval = shared["interval"]
+    if not isinstance(interval, (int, float)) or isinstance(interval, bool) or interval < 0.1:
+        print(f"YAML error: 'interval' must be a number >= 0.1, got {interval!r}")
+        return False
+    if interval > duration / 2:
+        print(f"YAML error: 'interval' ({interval}) must be <= duration/2 ({duration/2}) to guarantee at least 2 cgroup samples")
+        return False
+
+    for key in ("cpu", "namespace"):
+        if not isinstance(shared[key], str) or not shared[key].strip():
+            print(f"YAML error: '{key}' must be a non-empty string, got {shared[key]!r}")
             return False
+
+    subfolder = shared["results_subfolder_name"]
+    if not isinstance(subfolder, str) or not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9_\-]*$', subfolder):
+        print(f"YAML error: 'results_subfolder_name' must start with a letter or digit and contain only letters, digits, underscores, or hyphens. Got {subfolder!r}")
+        return False
+
+    try:
+        memory_bytes = parse_memory_bytes(shared["memory"])
+    except ValueError as e:
+        print(f"YAML error: {e}")
+        return False
+    if memory_bytes <= 0:
+        print(f"YAML error: 'memory' must be a positive value, got {shared['memory']!r}")
+        return False
+
+    sizes = shared["sizes"]
+    if not isinstance(sizes, list) or not sizes:
+        print("YAML error: 'sizes' must be a non-empty list")
+        return False
+    for n in sizes:
+        if not isinstance(n, int) or isinstance(n, bool) or n < 2:
+            print(f"YAML error: 'sizes' entries must be integers >= 2, got {n!r}")
+            return False
+        required = 3 * n * n * 8
+        if required > memory_bytes:
+            print(f"YAML error: N={n} needs {required // 1024**2}Mi for matrix allocation alone, memory limit is {memory_bytes // 1024**2}Mi")
+            return False
+
     return True
 
 def parse_memory_bytes(s):
@@ -88,7 +134,10 @@ def parse_memory_bytes(s):
     for suffix, mult in SUFFIX_MAP:
         if s.endswith(suffix):
             return int(s[:-len(suffix)]) * mult
-    return int(s)
+    try:
+        return int(s)
+    except ValueError:
+        raise ValueError(f"Unparseable memory value: {s!r}. Expected format: 512Mi, 2Gi, 1024, etc.")
 
 def estimate_duration(config):
     shared = config['shared_args']
@@ -104,9 +153,7 @@ def format_duration(seconds):
     return f"{s}s"
 
 def construct_command(script_path, shared_args, env_args):
-    # merge arguments
-    final_args = shared_args.copy()
-    final_args.update(env_args)
+    final_args = {**shared_args, **env_args}
 
     # remove non-script, orchestrator-only arg
     subfolder = final_args.pop('results_subfolder_name')
@@ -159,13 +206,11 @@ def run():
         return
     if not validate_config(config):
         return
-    if not check_oom(config['shared_args']['sizes'], config['shared_args']['memory']):
-        return
 
     estimated = estimate_duration(config)
     print(f"Estimated duration: ~{format_duration(estimated)}")
     print("(approximate - does not account for completed checkpoints)")
-    if input("Continue? [y/n] ").strip().lower() != 'y':
+    if input("Continue? [y/n] ").strip().lower() not in ('y', 'yes'):
         print("Aborted.")
         return
 

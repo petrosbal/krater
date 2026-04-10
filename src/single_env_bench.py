@@ -5,7 +5,9 @@ import os
 import threading
 import argparse
 import re
+import sys
 import yaml
+from pathlib import Path
 from datetime import datetime, timezone
 
 class CgroupHandler:
@@ -37,7 +39,10 @@ class CgroupHandler:
         for line in result.stdout.splitlines():
             parts = line.split()
             if parts and parts[0] == container_id:
-                pid = int(parts[1])
+                try:
+                    pid = int(parts[1])
+                except ValueError:
+                    raise RuntimeError(f"Unexpected PID format in task list: {line.strip()!r}")
                 break
 
         if pid is None:
@@ -100,14 +105,13 @@ class CgroupHandler:
 # ---------------
 
 
-from pathlib import Path
 DEFAULT_KUBECONFIG   = os.environ.get("KUBECONFIG", "/etc/rancher/k3s/k3s.yaml")
 POD_UID_TIMEOUT      = 30  # seconds to wait for the pod UID to appear after apply
 POD_RUNNING_TIMEOUT  = 60  # seconds to wait for the container to reach Running/Succeeded
 LOG_STREAM_OVERHEAD  = 30  # seconds added on top of benchmark duration as timeout for log streaming
 
 # executes a kubectl command via subprocess, returns full process result
-def kubectl(cmd_args, env=None, capture_output=True, check=False, input_bytes=None):
+def kubectl(cmd_args, env=None, capture_output=True, check=False, stdin=None):
     env = env or os.environ.copy()
     if "KUBECONFIG" not in env:
         env["KUBECONFIG"] = DEFAULT_KUBECONFIG
@@ -119,7 +123,7 @@ def kubectl(cmd_args, env=None, capture_output=True, check=False, input_bytes=No
                           stdout=subprocess.PIPE if capture_output else subprocess.DEVNULL,
                           stderr=subprocess.PIPE, 
                           check=check,
-                          input=input_bytes)
+                          input=stdin)
 
 # runs kubectl and returns the clean stdout string or None if the command fails
 def kubectl_output(cmd_args, env=None):
@@ -144,7 +148,7 @@ class PodOrchestrator:
 
     # attempts to load previous results from json to allow resuming from where you left off
     def _load_checkpoint(self):
-        if not os.path.exists(self.results_file):
+        if not Path(self.results_file).exists():
             return {}
         
         try:
@@ -166,9 +170,13 @@ class PodOrchestrator:
     # if we get killed mid-write the original results file stays intact.
     def _save_checkpoint(self):
         tmp = self.results_file + ".tmp"
-        with open(tmp, "w") as f:
-            json.dump(self.results, f, indent=2)
-        os.replace(tmp, self.results_file)
+        try:
+            with open(tmp, "w") as f:
+                json.dump(self.results, f, indent=2)
+            os.replace(tmp, self.results_file)
+        except OSError as e:
+            print(f"   [checkpoint] write failed: {e}")
+            raise
 
     # constructs the pod manifest dict, configuring name, image, args and resources
     def create_pod_yaml(self, pod_name, size, duration, warmup):
@@ -194,23 +202,22 @@ class PodOrchestrator:
                 "spec": pod_spec}
 
     # scrapes the container logs with regex to get metrics from the benchmark itself
-    # there must have been a better way to do this. anyway
     def parse_output(self, stdout):
-            metrics = {"raw_output": stdout}
-            mapping = {"iterations": int, "throughput_mflops": float, "valid": lambda x: x.upper()=="PASSED"}
-            patterns = {
-                "iterations": r"iterations:\s*(\d+)",
-                "throughput_mflops": r"throughput:\s*([\d.]+)",
-                "valid": r"calculation check:\s*(\w+)"
-            }
-            for key, pat in patterns.items():
-                m = re.search(pat, stdout, re.IGNORECASE)
-                if m:
-                    try:
-                        metrics[key] = mapping[key](m.group(1))
-                    except Exception:
-                        metrics[key] = None
-            return metrics
+        metrics = {"raw_output": stdout}
+        mapping = {"iterations": int, "throughput_mflops": float, "valid": lambda x: x.upper()=="PASSED"}
+        patterns = {
+            "iterations": r"iterations:\s*(\d+)",
+            "throughput_mflops": r"throughput:\s*([\d.]+)",
+            "valid": r"calculation check:\s*(\w+)"
+        }
+        for key, pat in patterns.items():
+            m = re.search(pat, stdout, re.IGNORECASE)
+            if m:
+                try:
+                    metrics[key] = mapping[key](m.group(1))
+                except Exception:
+                    metrics[key] = None
+        return metrics
 
     # manages the pod's lifecycle
     # maybe it does too much. clears stale instances, deploys new pod, polls the api
@@ -221,7 +228,7 @@ class PodOrchestrator:
 
         # 2. launch
         print("   launching pod...")
-        kubectl(["apply","-f","-"], env=env, check=True, capture_output=False, input_bytes=yaml.dump(manifest))
+        kubectl(["apply","-f","-"], env=env, check=True, capture_output=False, stdin=yaml.dump(manifest))
 
         # 3. wait for UID
         print("   waiting for pod uid...")
@@ -267,47 +274,47 @@ class PodOrchestrator:
 
     # processes the raw timestamped snapshots and calculates more trial metrics
     def compute_additional_metrics(self, trial_entry):
-            samples = trial_entry.get("samples", [])
-            phases = trial_entry.get("phases", {})
-            
-            if not samples: return None, "No cgroup samples"
-            if phases.get("running_time") is None or phases.get("start") is None:
-                return None, "Running/start timestamps missing"
-            
-            mem_values = []
-            cpu_cores = []
-            throttled_list = []
+        samples = trial_entry.get("samples", [])
+        phases = trial_entry.get("phases", {})
+        
+        if not samples: return None, "No cgroup samples"
+        if phases.get("running_time") is None or phases.get("start") is None:
+            return None, "Running/start timestamps missing"
+        
+        mem_values = []
+        cpu_cores = []
+        throttled_list = []
 
-            for i, s in enumerate(samples):
-                mem = s.get("mem_bytes")
-                cpu = s.get("usage_usec") if "usage_usec" in s else s.get("cpu_usec")
-                throttled = s.get("nr_throttled", 0)
+        for i, s in enumerate(samples):
+            mem = s.get("mem_bytes")
+            cpu = s.get("usage_usec") if "usage_usec" in s else s.get("cpu_usec")
+            throttled = s.get("nr_throttled", 0)
 
-                if mem is None or cpu is None: continue
-                mem_values.append(mem)
-                throttled_list.append(throttled)
+            if mem is None or cpu is None: continue
+            mem_values.append(mem)
+            throttled_list.append(throttled)
+            
+            if i > 0:
+                prev = samples[i-1]
+                prev_cpu = prev.get("usage_usec") if "usage_usec" in prev else prev.get("cpu_usec")
+                dt = s["timestamp"] - prev["timestamp"]
                 
-                if i > 0:
-                    prev = samples[i-1]
-                    prev_cpu = prev.get("usage_usec") if "usage_usec" in prev else prev.get("cpu_usec")
-                    dt = s["timestamp"] - prev["timestamp"]
-                    
-                    if dt > 0 and prev_cpu is not None:
-                        diff = cpu - prev_cpu
-                        cpu_cores.append((diff / dt) / 1_000_000)
+                if dt > 0 and prev_cpu is not None:
+                    diff = cpu - prev_cpu
+                    cpu_cores.append((diff / dt) / 1_000_000)
 
-            if not mem_values: return None, "No valid metrics"
-            
-            cold_start = phases["running_time"] - phases["start"]
-            throttled_events = (throttled_list[-1] - throttled_list[0]) if len(throttled_list) > 1 else 0
+        if not mem_values: return None, "No valid metrics"
+        
+        cold_start = phases["running_time"] - phases["start"]
+        throttled_events = (throttled_list[-1] - throttled_list[0]) if len(throttled_list) > 1 else 0
 
-            return {
-                "peak_mem_bytes": max(mem_values),
-                "avg_mem_bytes": sum(mem_values)/len(mem_values),
-                "avg_cpu_cores": sum(cpu_cores)/len(cpu_cores) if cpu_cores else 0,
-                "cold_start_time": cold_start,
-                "throttled_events": throttled_events
-            }, None
+        return {
+            "peak_mem_bytes": max(mem_values),
+            "avg_mem_bytes": sum(mem_values)/len(mem_values),
+            "avg_cpu_cores": sum(cpu_cores)/len(cpu_cores) if cpu_cores else 0,
+            "cold_start_time": cold_start,
+            "throttled_events": throttled_events
+        }, None
 
     # handles log streaming and monitoring sync
     def _execute_benchmark(self, pod_name, env, cgroup, stop_event, samples, phase_ts):
@@ -349,10 +356,10 @@ class PodOrchestrator:
             if "end" not in phase_ts:
                 print(f"   [stream] warning: ended without BENCH_END (timeout or crash)")
             if monitor_started:
-                stop_event.set()
+                stop_event.set()  # hopefully useless. stops monitor on crash/timeout path
                 if t_mon.is_alive():
                     t_mon.join()
-            proc.terminate()
+            proc.terminate()  # watchdog may have called this already. terminates kubectl
             proc.communicate()
 
         return "".join(stdout_lines)
@@ -367,9 +374,11 @@ class PodOrchestrator:
             "samples": samples
         }
 
-        additional, _ = self.compute_additional_metrics(trial_entry)
+        additional, reason = self.compute_additional_metrics(trial_entry)
         if additional:
             trial_entry["additional_metrics"] = additional
+        else:
+            print(f"   [metrics] additional metrics skipped: {reason}")
         
         key = f"{matrix_size}_{suffix}"
         if key not in self.results:
@@ -454,7 +463,7 @@ if __name__ == "__main__":
     # cgroup access needs root. force sudo
     if os.geteuid() != 0:
         print("error: run with sudo")
-        exit(1)
+        sys.exit(1)
 
     # init orchestrators
     orch = PodOrchestrator(args)

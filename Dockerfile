@@ -3,7 +3,7 @@
 # -----------------
 
 # -- C builder (native & static) --
-FROM debian:bullseye-slim AS builder-c
+FROM debian:bullseye-20260406-slim AS builder-c
 RUN apt-get update && apt-get install -y gcc libc6-dev
 WORKDIR /build
 COPY ./src/mmb.c .
@@ -13,7 +13,7 @@ RUN gcc -O3 -o mmb_debian mmb.c -lm
 RUN gcc -O3 -static -o mmb_static mmb.c -lm
 
 # -- wasm builder --
-FROM ghcr.io/webassembly/wasi-sdk:latest AS builder-wasm
+FROM ghcr.io/webassembly/wasi-sdk:wasi-sdk-32 AS builder-wasm
 WORKDIR /build
 COPY ./src/mmb.c .
 # 3. wasm compile
@@ -31,7 +31,7 @@ RUN $CC -O3 -o mmb.wasm mmb.c -lm
 # OUTPUT:  docker image (~80MB) containing the binary + debian shared libraries
 # WHY:     a standard, real-world Linux containerised application
 # ---------------------------------------------------------
-FROM debian:bullseye-slim AS debian
+FROM debian:bullseye-20260406-slim AS debian
 COPY --from=builder-c /build/mmb_debian /mmb
 ENTRYPOINT ["/mmb"]
 
