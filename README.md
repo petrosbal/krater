@@ -1,4 +1,5 @@
-# KRATER - Kubernetes Runtime Analysis Tool for Empirical Research
+# KRATER
+## Kubernetes Runtime Analysis Tool for Empirical Research
 
 ![License](https://img.shields.io/badge/License-GPLv3-gold)
 ![Status](https://img.shields.io/badge/Status-Private_Repo-red)
