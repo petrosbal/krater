@@ -1,4 +1,4 @@
-# Matrix Multiplication Benchmark
+# KRATER - Kubernetes Runtime Analysis Tool for Empirical Research
 
 ![License](https://img.shields.io/badge/License-GPLv3-gold)
 ![Status](https://img.shields.io/badge/Status-Private_Repo-red)
@@ -13,13 +13,13 @@
 
 ## Overview
 
-A benchmark comparing floating-point performance and resource efficiency across different container runtimes (standard Linux, static binary, WebAssembly). 
+A benchmarking framework for empirical comparison of WebAssembly and Linux container runtime environments in K3s, using cgroup-based resource monitoring and configurable compute workloads. 
 
 ## Project Structure
 
 * Source code (`src/`):
 
-    * **mmb.c**: Benchmark source. Performs matrix multiplication with integrated validity check. Outputs iterations and throughput in MFLOPS.
+    * **bench.c**: Benchmark source. Performs matrix multiplication with integrated validity check. Outputs iterations and throughput in MFLOPS.
 
     * **single_env_bench.py**: A Python orchestrator that handles pod deployment, log parsing, and cgroup resource monitoring for a single execution environment.
 
@@ -111,7 +111,7 @@ flowchart TD
     StatBuild --> Import
     WasmBuild --> Import
 ```
-Creates `mmb-debian:latest`, `mmb-static:latest`, `mmb-wasm:latest` and imports them into the K3s containerd registry.
+Creates `krater-debian:latest`, `krater-static:latest`, `krater-wasm:latest` and imports them into the K3s containerd registry.
 
 ### Cleanup
 
@@ -133,20 +133,21 @@ These are the pre-defined parameters of the benchmark suite:
 
 ```
 environments:
-  - image: mmb-debian:latest
+  - image: krater-debian:latest
     runtime_class: default
 
-  - image: mmb-static:latest
+  - image: krater-static:latest
     runtime_class: default
 
-  - image: mmb-wasm:latest
+  - image: krater-wasm:latest
     runtime_class: wasmtime
 
-  - image: mmb-wasm:latest
+  - image: krater-wasm:latest
     runtime_class: wasmedge
 
-  - image: mmb-wasm:latest
+  - image: krater-wasm:latest
     runtime_class: wasmer
+
 
 shared_args:
   sizes: [256, 1024]
@@ -155,6 +156,8 @@ shared_args:
   warmup: true
   interval: 0.5
   namespace: default
+  cpu: "1000m"
+  memory: "1024Mi"
   results_subfolder_name: test_bench
 ```
 
@@ -168,7 +171,7 @@ config:
 ---
 flowchart TB
  subgraph DataSources["Data Sources"]
-        PodLogs["mmb.c output 
+        PodLogs["bench.c output 
         (via kubectl logs)"]
         Cgroups["cgroup filesystem 
         (/sys/fs/cgroup)"]
@@ -214,7 +217,7 @@ gantt
     Running                      :pod2, after pod1, 7s
     Terminating                  :pod3, after pod2, 1s
     
-    section App (mmb.c)
+    section App (bench.c)
     init                         :ben1, after pod1, 1s
     warmup (5s)                  :ben2, after ben1, 1s
     workload loop                :crit, ben3, after ben2, 4s

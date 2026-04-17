@@ -328,7 +328,7 @@ class PodOrchestrator:
             stdout=subprocess.PIPE, text=True, env=env
         )
 
-        # if BENCH_END never appears (mmb.c crash, runtime hang, API server gone),
+        # if BENCH_END never appears (bench.c crash, runtime hang, API server gone),
         # readline blocks forever. kill kubectl after a generous deadline so the
         # trial fails cleanly instead of freezing the whole run.
         timeout = self.args.duration + LOG_STREAM_OVERHEAD

@@ -1,9 +1,9 @@
 export DOCKER_BUILDKIT=1
-IMAGES = mmb-debian:latest mmb-static:latest mmb-wasm:latest
+IMAGES = krater-debian:latest krater-static:latest krater-wasm:latest
 #these are auto-generated when running the dockerfile build stages.
-BUILD_TOOLS = ghcr.io/webassembly/wasi-sdk:latest debian:bullseye-slim
+BUILD_TOOLS = ghcr.io/webassembly/wasi-sdk:wasi-sdk-32 debian:bullseye-20260406-slim
 
-.PHONY: help image-build k3s-import reset hard-reset results-clean status setup-wasm run check-deps
+.PHONY: help image-build k3s-import reset hard-reset results-clean status setup-wasm setup-docker run check-deps
 
 BLUE    := \033[1;36m
 GREEN   := \033[1;32m
@@ -15,9 +15,9 @@ RESET   := \033[0m
 all: help
 
 image-build: ## Build all variants and import to k3s (requires sudo)
-	docker build -t mmb-debian:latest .
-	docker build --target static -t mmb-static:latest .
-	docker build --target wasm -t mmb-wasm:latest .
+	docker build -t krater-debian:latest .
+	docker build --target static -t krater-static:latest .
+	docker build --target wasm -t krater-wasm:latest .
 	$(MAKE) k3s-import
 
 k3s-import:
@@ -47,6 +47,10 @@ check-deps: ## Check all required tools are installed
 	printf "\n"; \
 	exit $$missing
 
+setup-docker: ## Set up Docker to run without sudo (needs re-login)
+	sudo usermod -aG docker $(USER)
+	@echo "Done. Log out and back in (or run 'newgrp docker') for the change to take effect."
+
 setup-wasm: ## Set up WASM shim symlinks in /usr/local/bin (requires sudo, K3s, KWasm)
 	sudo ln -sf /opt/kwasm/bin/containerd-shim-wasmtime-v1 /usr/local/bin/containerd-shim-wasmtime-v1
 	sudo ln -sf /opt/kwasm/bin/containerd-shim-wasmedge-v1 /usr/local/bin/containerd-shim-wasmedge-v1
@@ -56,7 +60,7 @@ run: ## Run the full benchmark suite (requires sudo)
 	sudo python3 src/metaorchestrator.py
 
 results-clean: ## Remove the results directory contents (requires sudo)
-	sudo rm -rf ./results/*
+	sudo rm -rf results/*
 
 help: ## Show this help message
 	@echo  ""
@@ -80,7 +84,7 @@ help: ## Show this help message
 	@echo  ""
 
 status: ## Show images' status in Docker and k3s storage
-	@printf "\n- MMB IMAGE STATUS -\n"
+	@printf "\n- KRATER IMAGE STATUS -\n"
 	@printf -- "--------------------------------------------\n"
 	@printf "%-25s %-11s %-10s\n" "IMAGE" "DOCKER" "K3S"
 	@D=$$(docker images --format "{{.Repository}}:{{.Tag}}"); \

@@ -1,18 +1,18 @@
 # bench_config.yaml
 environments:
-  - image: mmb-debian:latest
+  - image: krater-debian:latest
     runtime_class: default
 
-  - image: mmb-static:latest
+  - image: krater-static:latest
     runtime_class: default
 
-  - image: mmb-wasm:latest
+  - image: krater-wasm:latest
     runtime_class: wasmtime
 
-  - image: mmb-wasm:latest
+  - image: krater-wasm:latest
     runtime_class: wasmedge
 
-  - image: mmb-wasm:latest
+  - image: krater-wasm:latest
     runtime_class: wasmer
 
 

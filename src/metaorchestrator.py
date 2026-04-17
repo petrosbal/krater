@@ -1,3 +1,18 @@
+# Copyright (C) 2026 Petros Baloglou, University of Macedonia
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import yaml
 import subprocess
 import sys
@@ -8,7 +23,7 @@ YAML_FILE = "src/bench_config.yaml"
 SCRIPT_NAME = "src/single_env_bench.py"
 PYTHON_EXEC = sys.executable # i use the orchestrator's interpreter for the single env script
 
-WARMUP_DURATION       = 5   # seconds. matches warmup loop in mmb.c
+WARMUP_DURATION       = 5   # seconds. matches warmup loop in bench.c
 POD_OVERHEAD_ESTIMATE = 15  # seconds per trial (delete, apply, uid/running wait, cleanup)
 
 # k (lowercase) is the canonical K8s prefix (not a typo)
@@ -159,11 +174,11 @@ def construct_command(script_path, shared_args, env_args):
     subfolder = final_args.pop('results_subfolder_name')
 
     # handle output dir & filename
-    # for instance, results/test_bench/mmb-debian_default.json
+    # for instance, results/test_bench/bench-debian_default.json
     output_dir = Path("results") / subfolder
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # clean the image name a bit (mmb-debian:latest -> mmb-debian)
+    # clean the image name a bit (bench-debian:latest -> bench-debian)
     safe_image_name = final_args['image'].split(':')[0]
     safe_runtime = final_args['runtime_class']
     output_filename = output_dir / f"{safe_image_name}_{safe_runtime}.json"
