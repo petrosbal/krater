@@ -2,7 +2,7 @@
 ## Kubernetes Runtime Analysis Tool for Empirical Research
 
 ![License](https://img.shields.io/badge/License-GPLv3-gold)
-![Status](https://img.shields.io/badge/Status-Private_Repo-red)
+![Status](https://img.shields.io/badge/Status-Public_Repo-darkblue)
 
 ![C](https://img.shields.io/badge/Language-C-A8B9CC?style=flat&logo=c&logoColor=white)
 ![Python](https://img.shields.io/badge/Language-Python-3776AB?style=flat&logo=python&logoColor=white)
