@@ -28,7 +28,7 @@ RUN $CC -O2 -o bench.wasm bench.c -lm
 # 1. DEBIAN DCI
 # INPUT:   bench_debian (from builder stage)
 # PROCESS: multi-stage build (runs inside debian-slim)
-# OUTPUT:  docker image (~80MB) containing the binary + debian shared libraries
+# OUTPUT:  docker image (~30MB) containing the binary + debian shared libraries
 # WHY:     a standard, real-world Linux containerised application
 # ---------------------------------------------------------
 FROM debian:bullseye-20260406-slim AS debian
@@ -40,7 +40,7 @@ ENTRYPOINT ["/bench"]
 # 2. SCRATCH (STATIC)
 # INPUT:   bench_static (from builder stage - statically linked)
 # PROCESS: single-stage copy (no OS, no shell, no libraries)
-# OUTPUT:  docker image (~20KB) containing only the executable
+# OUTPUT:  docker image (~350kB) containing only the executable
 # WHY:     minimal runtime overhead. no userspace dependencies
 # ---------------------------------------------------------
 FROM scratch AS static
@@ -52,7 +52,7 @@ ENTRYPOINT ["/bench"]
 # 3. WASM
 # INPUT:   bench.wasm (from wasi-sdk builder stage)
 # PROCESS: WASI runtime execution
-# OUTPUT:  docker image (~100KB)
+# OUTPUT:  docker image (~75kB)
 # WHY:     whole point of this thesis...!
 # ---------------------------------------------------------
 FROM scratch AS wasm
