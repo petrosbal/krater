@@ -49,6 +49,18 @@ A benchmarking framework for empirical comparison of WebAssembly and Linux conta
 
 ## Installation & Setup
 
+### 0. Install system dependencies
+
+**Docker:**
+```bash
+curl -fsSL https://get.docker.com | sudo sh
+```
+
+**K3s** (also installs containerd and kubectl):
+```bash
+curl -sfL https://get.k3s.io | sh -
+```
+
 ### 1. Verify dependencies
 
 ```bash
