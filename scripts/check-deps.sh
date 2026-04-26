@@ -51,7 +51,7 @@ python3 -c "import yaml" 2>/dev/null \
     && printf "  ${GREEN}[ok]${RESET} shim binaries\n" \
     || { printf "  ${RED}[!!]${RESET} shim binaries  — not found in /usr/local/bin, run: make setup-wasm\n"; missing=1; }
 
-kubectl get runtimeclass wasmtime wasmedge wasmer >/dev/null 2>&1 \
+sudo kubectl get runtimeclass wasmtime wasmedge wasmer >/dev/null 2>&1 \
     && printf "  ${GREEN}[ok]${RESET} runtimeclasses\n" \
     || { printf "  ${RED}[!!]${RESET} runtimeclasses — not found, run: make setup-wasm\n"; missing=1; }
 
