@@ -3,7 +3,10 @@ IMAGES = krater-debian:latest krater-static:latest krater-wasm:latest
 #these are auto-generated when running the dockerfile build stages.
 BUILD_TOOLS = ghcr.io/webassembly/wasi-sdk:wasi-sdk-32 debian:bullseye-20260406-slim
 
-.PHONY: help image-build k3s-import reset hard-reset results-clean status setup-wasm setup-docker run check-deps
+RUNWASI_VERSION := 0.6.0
+ARCH            := $(shell uname -m)
+
+.PHONY: help image-build k3s-import reset hard-reset results-clean status setup-wasm teardown-wasm setup-docker run check-deps
 
 BLUE    := \033[1;36m
 GREEN   := \033[1;32m
@@ -33,28 +36,17 @@ hard-reset: reset results-clean ## Remove everything including Dockerfile-genera
 	docker image prune -f
 
 check-deps: ## Check all required tools are installed
-	@printf "\n- DEPENDENCY CHECK -\n"
-	@printf -- "--------------------------------------------\n"
-	@missing=0; \
-	command -v docker  >/dev/null 2>&1 && printf "  $(GREEN)[ok]$(RESET) docker\n"  || { printf "  $(RED)[!!]$(RESET) docker  — not found\n";  missing=1; }; \
-	command -v k3s     >/dev/null 2>&1 && printf "  $(GREEN)[ok]$(RESET) k3s\n"     || { printf "  $(RED)[!!]$(RESET) k3s     — not found\n";     missing=1; }; \
-	command -v kubectl >/dev/null 2>&1 && printf "  $(GREEN)[ok]$(RESET) kubectl\n" || { printf "  $(RED)[!!]$(RESET) kubectl — not found\n"; missing=1; }; \
-	command -v python3 >/dev/null 2>&1 && printf "  $(GREEN)[ok]$(RESET) python3\n" || { printf "  $(RED)[!!]$(RESET) python3 — not found\n"; missing=1; }; \
-	python3 -c "import yaml" 2>/dev/null && printf "  $(GREEN)[ok]$(RESET) pyyaml\n" || { printf "  $(RED)[!!]$(RESET) pyyaml         — not found (pip install pyyaml)\n"; missing=1; }; \
-	{ test -f /opt/kwasm/bin/containerd-shim-wasmtime-v1 && test -f /opt/kwasm/bin/containerd-shim-wasmedge-v1 && test -f /opt/kwasm/bin/containerd-shim-wasmer-v1; } && printf "  $(GREEN)[ok]$(RESET) shim binaries\n" || { printf "  $(RED)[!!]$(RESET) shim binaries  — not found in /opt/kwasm/bin, is KWasm installed?\n"; missing=1; }; \
-	{ test -L /usr/local/bin/containerd-shim-wasmtime-v1 && test -L /usr/local/bin/containerd-shim-wasmedge-v1 && test -L /usr/local/bin/containerd-shim-wasmer-v1; } && printf "  $(GREEN)[ok]$(RESET) shim symlinks\n" || { printf "  $(RED)[!!]$(RESET) shim symlinks  — missing in /usr/local/bin, run: make setup-wasm\n"; missing=1; }; \
-	kubectl get runtimeclass wasmtime wasmedge wasmer >/dev/null 2>&1 && printf "  $(GREEN)[ok]$(RESET) runtimeclasses\n" || { printf "  $(RED)[!!]$(RESET) runtimeclasses — not found, is KWasm installed?\n"; missing=1; }; \
-	printf "\n"; \
-	exit $$missing
+	@bash scripts/check-deps.sh
 
 setup-docker: ## Set up Docker to run without sudo (needs re-login)
 	sudo usermod -aG docker $(USER)
 	@echo "Done. Log out and back in (or run 'newgrp docker') for the change to take effect."
 
-setup-wasm: ## Set up WASM shim symlinks in /usr/local/bin (requires sudo, K3s, KWasm)
-	sudo ln -sf /opt/kwasm/bin/containerd-shim-wasmtime-v1 /usr/local/bin/containerd-shim-wasmtime-v1
-	sudo ln -sf /opt/kwasm/bin/containerd-shim-wasmedge-v1 /usr/local/bin/containerd-shim-wasmedge-v1
-	sudo ln -sf /opt/kwasm/bin/containerd-shim-wasmer-v1 /usr/local/bin/containerd-shim-wasmer-v1
+setup-wasm: ## Set up WASM shim binaries and restart K3s (requires sudo)
+	@bash scripts/setup-wasm.sh $(RUNWASI_VERSION) $(ARCH)
+
+teardown-wasm: ## Remove WASM shim binaries — creates clean slate (requires sudo)
+	@bash scripts/teardown-wasm.sh
 
 run: ## Run the full benchmark suite (requires sudo)
 	sudo python3 src/metaorchestrator.py
@@ -84,15 +76,4 @@ help: ## Show this help message
 	@echo  ""
 
 status: ## Show images' status in Docker and k3s storage
-	@printf "\n- KRATER IMAGE STATUS -\n"
-	@printf -- "--------------------------------------------\n"
-	@printf "%-25s %-11s %-10s\n" "IMAGE" "DOCKER" "K3S"
-	@D=$$(docker images --format "{{.Repository}}:{{.Tag}}"); \
-	K=$$(sudo k3s ctr images list); \
-	for i in $(IMAGES); do \
-		d="[    ]"; k="[    ]"; dc="$(RESET)"; kc="$(RESET)"; \
-		echo "$$D" | grep -q "$$i" && { d="[ ok ]"; dc="$(GREEN)"; }; \
-		echo "$$K" | grep -q "$$i" && { k="[ ok ]"; kc="$(GREEN)"; }; \
-		printf "%-25s %b%-10s%b %b%-10s%b\n" "$$i" "$$dc" "$$d" "$(RESET)" "$$kc" "$$k" "$(RESET)"; \
-	done
-	@echo ""
+	@bash scripts/status.sh $(IMAGES)

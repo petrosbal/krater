@@ -35,15 +35,17 @@ A benchmarking framework for empirical comparison of WebAssembly and Linux conta
 
 * **Makefile**: Manages the full project lifecycle - dependency checking, WASM shim setup, image building, running the benchmark suite, and cleanup.
 
+* **scripts/**: Shell scripts backing the complex Makefile targets (`check-deps.sh`, `setup-wasm.sh`, `teardown-wasm.sh`, `status.sh`).
+
 
 ## Prerequisites
 
-- Linux with root access (required for `/sys/fs/cgroup`)
-- [K3s](https://k3s.io/) with containerd
-- Docker (BuildKit enabled)
+- Linux with root access and cgroup v2 (`/sys/fs/cgroup`)
+- [K3s](https://k3s.io/) ≥ v1.34 with containerd
+- Docker ≥ v24 (BuildKit enabled)
 - `kubectl` configured for K3s (`KUBECONFIG=/etc/rancher/k3s/k3s.yaml`)
-- Python 3 with `pyyaml` (`pip install pyyaml`)
-- [KWasm Operator](https://kwasm.sh/) (for WASM targets)
+- Python ≥ 3.8 with `pyyaml` (`pip install pyyaml`)
+- [runwasi](https://github.com/containerd/runwasi) v0.6.0 shim binaries (installed via `make setup-wasm`)
 
 ## Installation & Setup
 
@@ -53,22 +55,9 @@ A benchmarking framework for empirical comparison of WebAssembly and Linux conta
 make check-deps
 ```
 
-### 2. Set up WASM support (WASM targets only)
+### 2. Set up WASM support
 
-Install the KWasm operator via Helm:
-
-```bash
-helm repo add kwasm http://kwasm.sh/kwasm-operator/
-helm install -n kwasm --create-namespace kwasm-operator kwasm/kwasm-operator
-```
-
-Annotate the node to trigger shim binary installation (replace `<node-name>` with your node):
-
-```bash
-kubectl annotate node <node-name> kwasm.sh/kwasm-node=true
-```
-
-Wait for the installer pod to complete, then create the required symlinks:
+Downloads [runwasi](https://github.com/containerd/runwasi) v0.6.0 shim binaries for `wasmtime`, `wasmedge`, and `wasmer`, installs them to `/usr/local/bin/`, and restarts K3s. K3s auto-detects the binaries on startup and registers them with containerd.
 
 ```bash
 make setup-wasm
