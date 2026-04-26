@@ -24,7 +24,14 @@ k3s-killall.sh
 systemctl start k3s
 
 printf "Waiting for K3s API server"
+deadline=$(( $(date +%s) + 120 ))
 until kubectl get nodes >/dev/null 2>&1; do
+    if [ "$(date +%s)" -ge "$deadline" ]; then
+        printf "\n"
+        printf "ERROR: K3s API server did not become ready within 120s\n" >&2
+        kubectl get nodes >&2
+        exit 1
+    fi
     printf "."
     sleep 2
 done
