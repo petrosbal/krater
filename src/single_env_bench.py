@@ -108,7 +108,7 @@ class CgroupHandler:
 DEFAULT_KUBECONFIG   = os.environ.get("KUBECONFIG", "/etc/rancher/k3s/k3s.yaml")
 POD_UID_TIMEOUT      = 30  # seconds to wait for the pod UID to appear after apply
 POD_RUNNING_TIMEOUT  = 60  # seconds to wait for the container to reach Running/Succeeded
-LOG_STREAM_OVERHEAD  = 30  # seconds added on top of benchmark duration as timeout for log streaming
+LOG_STREAM_OVERHEAD  = 200  # seconds added on top of benchmark duration as timeout for log streaming
 
 # executes a kubectl command via subprocess, returns full process result
 def kubectl(cmd_args, env=None, capture_output=True, check=False, stdin=None):
@@ -384,7 +384,11 @@ class PodOrchestrator:
         if key not in self.results:
             self.results[key] = []
 
-        self.results[key].append(trial_entry)
+        existing = next((i for i, e in enumerate(self.results[key]) if e["trial"] == trial_idx), None)
+        if existing is not None:
+            self.results[key][existing] = trial_entry
+        else:
+            self.results[key].append(trial_entry)
         self._save_checkpoint()
 
     # handles full pod cleanup after the trial, so that there arent any conflicts at the next one
