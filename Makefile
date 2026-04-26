@@ -43,10 +43,10 @@ setup-docker: ## Set up Docker to run without sudo (needs re-login)
 	@echo "Done. Log out and back in (or run 'newgrp docker') for the change to take effect."
 
 setup-wasm: ## Set up WASM shim binaries and restart K3s (requires sudo)
-	@bash scripts/setup-wasm.sh $(RUNWASI_VERSION) $(ARCH)
+	@sudo bash scripts/setup-wasm.sh $(RUNWASI_VERSION) $(ARCH)
 
 teardown-wasm: ## Remove WASM shim binaries — creates clean slate (requires sudo)
-	@bash scripts/teardown-wasm.sh
+	@sudo bash scripts/teardown-wasm.sh
 
 run: ## Run the full benchmark suite (requires sudo)
 	sudo python3 src/metaorchestrator.py
