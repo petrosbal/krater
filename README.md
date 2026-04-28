@@ -9,8 +9,7 @@
 ![K3s](https://img.shields.io/badge/Orchestrator-K3s-FF401C?style=flat&logo=kubernetes&logoColor=white)
 ![Wasm](https://img.shields.io/badge/WASM-624fe8?logo=webassembly&logoColor=white)
 
-![Cgroup Monitoring](https://img.shields.io/badge/Monitoring-cgroup%20-success)
-![Metrics](https://img.shields.io/badge/Metrics-MFLOPS%20%2B%20Resource%20Usage-brown)
+![Cgroup Monitoring](https://img.shields.io/badge/Monitoring-cgroups_v2%20-success)
 
 ## Overview
 
