@@ -1,23 +1,30 @@
 # -----------------
 # INTERNAL BUILDERS
 # -----------------
+ARG OPTIMIZATION_LEVEL=0
 
+# --------------------------------------------------------------------
 # -- C builder (native & static) --
 FROM debian:bullseye-20260406-slim AS builder-c
+ARG OPTIMIZATION_LEVEL
 RUN apt-get update && apt-get install -y gcc libc6-dev
 WORKDIR /build
 COPY ./src/bench.c .
-# 1. native compile
-RUN gcc -O2 -o bench_debian bench.c -lm
-# 2. static compile (for the scratch image)
-RUN gcc -O2 -static -o bench_static bench.c -lm
 
-# -- wasm builder --
+# 1. native compile
+RUN gcc -O${OPTIMIZATION_LEVEL} -o bench_debian bench.c -lm
+# 2. static compile (for the scratch image)
+RUN gcc -O${OPTIMIZATION_LEVEL} -static -o bench_static bench.c -lm
+
+# --------------------------------------------------------------------
+# -- WASM builder --
 FROM ghcr.io/webassembly/wasi-sdk:wasi-sdk-32 AS builder-wasm
+ARG OPTIMIZATION_LEVEL
 WORKDIR /build
 COPY ./src/bench.c .
+
 # 3. wasm compile
-RUN $CC -O2 -o bench.wasm bench.c -lm
+RUN $CC -O${OPTIMIZATION_LEVEL} -o bench.wasm bench.c -lm
 
 
 # ------------
