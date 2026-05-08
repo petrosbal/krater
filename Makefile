@@ -45,7 +45,7 @@ setup-docker: ## Set up Docker to run without sudo (needs re-login)
 setup-wasm: ## Set up WASM shim binaries and restart K3s (requires sudo)
 	@sudo bash scripts/setup-wasm.sh $(RUNWASI_VERSION) $(ARCH)
 
-teardown-wasm: ## Remove WASM shim binaries — creates clean slate (requires sudo)
+teardown-wasm: ## Remove WASM shim binaries - creates clean slate (requires sudo)
 	@sudo bash scripts/teardown-wasm.sh
 
 run: ## Run the full benchmark suite (requires sudo)
