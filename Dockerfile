@@ -27,6 +27,18 @@ COPY ./src/bench.c .
 RUN $CC -O${OPTIMIZATION_LEVEL} -o bench.wasm bench.c -lm
 
 
+# --------------------------------------------------------------------
+# -- WASM AOT builder (Universal WASM via wasmedge compile) --
+FROM debian:bullseye-20260406-slim AS builder-wasm-aot
+ARG OPTIMIZATION_LEVEL
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+RUN curl -sSfL https://github.com/WasmEdge/WasmEdge/releases/download/0.14.1/WasmEdge-0.14.1-ubuntu20.04_x86_64.tar.gz \
+    | tar -xz -C /usr/local --strip-components=1
+WORKDIR /build
+COPY --from=builder-wasm /build/bench.wasm .
+RUN wasmedge compile --optimize ${OPTIMIZATION_LEVEL} bench.wasm bench_aot.wasm
+
+
 # ------------
 # FINAL IMAGES
 # ------------
@@ -68,7 +80,13 @@ ENTRYPOINT ["/bench.wasm"]
 
 
 # ---------------------------------------------------------
-# DEFAULT TARGET
-# Ensures 'docker build .' defaults to the debian image
+# 4. WASM AOT (Universal WASM)
+# INPUT:   bench_aot.wasm (wasmedge compile output - valid .wasm with embedded native AOT section)
+# PROCESS: WASI runtime via wasmedge RuntimeClass; shim detects and executes AOT section
+# OUTPUT:  docker image (~2MB) containing the Universal WASM binary
+# WHY:     isolates LLVM AOT backend (wasmedge) vs Cranelift JIT (wasmtime/wasmer);
+#          same source and OPTIMIZATION_LEVEL as krater-wasm
 # ---------------------------------------------------------
-FROM debian AS default
+FROM scratch AS wasm-aot
+COPY --from=builder-wasm-aot /build/bench_aot.wasm /bench_aot.wasm
+ENTRYPOINT ["/bench_aot.wasm"]

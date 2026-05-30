@@ -1,5 +1,5 @@
 export DOCKER_BUILDKIT=1
-IMAGES = krater-debian:latest krater-static:latest krater-wasm:latest
+IMAGES = krater-debian:latest krater-static:latest krater-wasm:latest krater-wasm-aot:latest
 #these are auto-generated when running the dockerfile build stages.
 BUILD_TOOLS = ghcr.io/webassembly/wasi-sdk:wasi-sdk-32 debian:bullseye-20260406-slim
 
@@ -18,9 +18,10 @@ RESET   := \033[0m
 all: help
 
 image-build: ## Build all variants and import to k3s (requires sudo)
-	docker build -t krater-debian:latest .
+	docker build --target debian -t krater-debian:latest .
 	docker build --target static -t krater-static:latest .
 	docker build --target wasm -t krater-wasm:latest .
+	docker build --target wasm-aot -t krater-wasm-aot:latest .
 	$(MAKE) k3s-import
 
 k3s-import:
