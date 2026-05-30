@@ -8,7 +8,6 @@ import re
 import sys
 import yaml
 from pathlib import Path
-from datetime import datetime, timezone
 
 class CgroupHandler:
     
@@ -108,7 +107,7 @@ class CgroupHandler:
 DEFAULT_KUBECONFIG   = os.environ.get("KUBECONFIG", "/etc/rancher/k3s/k3s.yaml")
 POD_UID_TIMEOUT      = 30  # seconds to wait for the pod UID to appear after apply
 POD_RUNNING_TIMEOUT  = 60  # seconds to wait for the container to reach Running/Succeeded
-LOG_STREAM_OVERHEAD  = 200  # seconds added on top of benchmark duration as timeout for log streaming
+LOG_STREAM_OVERHEAD  = 500  # seconds added on top of benchmark duration as timeout for log streaming
 
 # executes a kubectl command via subprocess, returns full process result
 def kubectl(cmd_args, env=None, capture_output=True, check=False, stdin=None):
@@ -224,10 +223,10 @@ class PodOrchestrator:
     def prepare_pod(self, pod_name, manifest, env):
         # 1. cleanup
         kubectl(["delete","pod",pod_name,"-n",self.args.namespace,"--grace-period=0","--force"], env=env, capture_output=False)
-        time.sleep(2)
 
         # 2. launch
         print("   launching pod...")
+        start_time = time.time()
         kubectl(["apply","-f","-"], env=env, check=True, capture_output=False, stdin=yaml.dump(manifest))
 
         # 3. wait for UID
@@ -243,27 +242,16 @@ class PodOrchestrator:
         # 4. wait for Running
         print("   waiting for container to start...")
         start_wait = time.time()
-        phase = None
+        running_time = None
         while True:
             if time.time() - start_wait > POD_RUNNING_TIMEOUT: raise TimeoutError("timed out waiting for Running state")
             phase = kubectl_output(["get","pod",pod_name,"-n",self.args.namespace,"-o","jsonpath={.status.phase}"], env)
-            if phase in ("Running", "Succeeded"): break
+            if phase in ("Running", "Succeeded"):
+                running_time = time.time()
+                break
             if phase == "Failed": raise RuntimeError("Pod failed to start")
-            time.sleep(0.5)
 
-        # get the exact container start time from the runtime rather than relying on when
-        # our polling loop happened to observe the transition (which would be up to 0.5s off)
-        if phase == "Running":
-            ts_path = "jsonpath={.status.containerStatuses[0].state.running.startedAt}"
-        else:
-            ts_path = "jsonpath={.status.containerStatuses[0].state.terminated.startedAt}"
-
-        ts_raw = kubectl_output(["get","pod",pod_name,"-n",self.args.namespace,"-o",ts_path], env)
-        if not ts_raw:
-            raise RuntimeError(f"could not get container startedAt timestamp for pod {pod_name}")
-        running_time = datetime.fromisoformat(ts_raw.replace("Z", "+00:00")).timestamp()
-
-        return uid, CgroupHandler(pod_name, self.args.namespace, env), running_time
+        return uid, CgroupHandler(pod_name, self.args.namespace, env), start_time, running_time
 
     # polls cgroup stats and appends them in a list until main thread signals stop
     def monitor_cgroup(self, cgroup, interval, stop_event, samples):
@@ -411,10 +399,11 @@ class PodOrchestrator:
         if "KUBECONFIG" not in env:
             env["KUBECONFIG"] = DEFAULT_KUBECONFIG
         manifest = self.create_pod_yaml(pod_name, matrix_size, self.args.duration, warmup)
-        phase_ts = {"start": time.time()}
+        phase_ts = {}
 
         try:
-            uid, cgroup, running_time = self.prepare_pod(pod_name, manifest, env)
+            uid, cgroup, start_time, running_time = self.prepare_pod(pod_name, manifest, env)
+            phase_ts["start"] = start_time
             phase_ts["running_time"] = running_time
             
             stop_event = threading.Event()
