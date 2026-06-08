@@ -1,0 +1,67 @@
+0000000000001530 <matrix_mult>:
+    1530:	89 c8                	mov    eax,ecx
+    1532:	41 54                	push   r12
+    1534:	49 89 d2             	mov    r10,rdx
+    1537:	49 89 fc             	mov    r12,rdi
+    153a:	0f af c1             	imul   eax,ecx
+    153d:	55                   	push   rbp
+    153e:	89 cd                	mov    ebp,ecx
+    1540:	53                   	push   rbx
+    1541:	48 89 f3             	mov    rbx,rsi
+    1544:	85 c0                	test   eax,eax
+    1546:	74 17                	je     155f <matrix_mult+0x2f>
+    1548:	48 98                	cdqe
+    154a:	4c 89 d7             	mov    rdi,r10
+    154d:	31 f6                	xor    esi,esi
+    154f:	48 8d 14 c5 00 00 00 	lea    rdx,[rax*8+0x0]
+    1556:	00 
+    1557:	e8 24 fb ff ff       	call   1080 <memset@plt>
+    155c:	49 89 c2             	mov    r10,rax
+    155f:	85 ed                	test   ebp,ebp
+    1561:	0f 8e 86 00 00 00    	jle    15ed <matrix_mult+0xbd>
+    1567:	8d 45 ff             	lea    eax,[rbp-0x1]
+    156a:	4c 63 c5             	movsxd r8,ebp
+    156d:	45 31 db             	xor    r11d,r11d
+    1570:	48 c1 e0 03          	shl    rax,0x3
+    1574:	49 c1 e0 03          	shl    r8,0x3
+    1578:	4d 8d 4c 04 08       	lea    r9,[r12+rax*1+0x8]
+    157d:	41 89 ec             	mov    r12d,ebp
+    1580:	49 8d 4c 02 08       	lea    rcx,[r10+rax*1+0x8]
+    1585:	49 f7 dc             	neg    r12
+    1588:	49 c1 e4 03          	shl    r12,0x3
+    158c:	0f 1f 40 00          	nop    DWORD PTR [rax+0x0]
+    1590:	4b 8d 34 0c          	lea    rsi,[r12+r9*1]
+    1594:	48 89 df             	mov    rdi,rbx
+    1597:	66 0f 1f 84 00 00 00 	nop    WORD PTR [rax+rax*1+0x0]
+    159e:	00 00 
+    15a0:	f2 0f 10 0e          	movsd  xmm1,QWORD PTR [rsi]
+    15a4:	48 89 fa             	mov    rdx,rdi
+    15a7:	4c 89 d0             	mov    rax,r10
+    15aa:	66 0f 1f 44 00 00    	nop    WORD PTR [rax+rax*1+0x0]
+    15b0:	f2 0f 10 02          	movsd  xmm0,QWORD PTR [rdx]
+    15b4:	48 83 c0 08          	add    rax,0x8
+    15b8:	48 83 c2 08          	add    rdx,0x8
+    15bc:	f2 0f 59 c1          	mulsd  xmm0,xmm1
+    15c0:	f2 0f 58 40 f8       	addsd  xmm0,QWORD PTR [rax-0x8]
+    15c5:	f2 0f 11 40 f8       	movsd  QWORD PTR [rax-0x8],xmm0
+    15ca:	48 39 c8             	cmp    rax,rcx
+    15cd:	75 e1                	jne    15b0 <matrix_mult+0x80>
+    15cf:	48 83 c6 08          	add    rsi,0x8
+    15d3:	4c 01 c7             	add    rdi,r8
+    15d6:	49 39 f1             	cmp    r9,rsi
+    15d9:	75 c5                	jne    15a0 <matrix_mult+0x70>
+    15db:	41 83 c3 01          	add    r11d,0x1
+    15df:	4d 01 c1             	add    r9,r8
+    15e2:	4d 01 c2             	add    r10,r8
+    15e5:	4c 01 c1             	add    rcx,r8
+    15e8:	44 39 dd             	cmp    ebp,r11d
+    15eb:	75 a3                	jne    1590 <matrix_mult+0x60>
+    15ed:	5b                   	pop    rbx
+    15ee:	5d                   	pop    rbp
+    15ef:	41 5c                	pop    r12
+    15f1:	c3                   	ret
+    15f2:	66 66 2e 0f 1f 84 00 	data16 cs nop WORD PTR [rax+rax*1+0x0]
+    15f9:	00 00 00 00 
+    15fd:	0f 1f 00             	nop    DWORD PTR [rax]
+
+0000000000001600 <valid_results>:

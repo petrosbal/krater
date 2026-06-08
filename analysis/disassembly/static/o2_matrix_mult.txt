@@ -1,0 +1,67 @@
+0000000000402080 <matrix_mult>:
+  402080:	89 c8                	mov    eax,ecx
+  402082:	41 54                	push   r12
+  402084:	49 89 d2             	mov    r10,rdx
+  402087:	49 89 fc             	mov    r12,rdi
+  40208a:	0f af c1             	imul   eax,ecx
+  40208d:	55                   	push   rbp
+  40208e:	89 cd                	mov    ebp,ecx
+  402090:	53                   	push   rbx
+  402091:	48 89 f3             	mov    rbx,rsi
+  402094:	85 c0                	test   eax,eax
+  402096:	74 17                	je     4020af <matrix_mult+0x2f>
+  402098:	48 98                	cdqe
+  40209a:	4c 89 d7             	mov    rdi,r10
+  40209d:	31 f6                	xor    esi,esi
+  40209f:	48 8d 14 c5 00 00 00 	lea    rdx,[rax*8+0x0]
+  4020a6:	00 
+  4020a7:	e8 e4 ef ff ff       	call   401090 <.plt+0x78>
+  4020ac:	49 89 c2             	mov    r10,rax
+  4020af:	85 ed                	test   ebp,ebp
+  4020b1:	0f 8e 86 00 00 00    	jle    40213d <matrix_mult+0xbd>
+  4020b7:	8d 45 ff             	lea    eax,[rbp-0x1]
+  4020ba:	4c 63 c5             	movsxd r8,ebp
+  4020bd:	45 31 db             	xor    r11d,r11d
+  4020c0:	48 c1 e0 03          	shl    rax,0x3
+  4020c4:	49 c1 e0 03          	shl    r8,0x3
+  4020c8:	4d 8d 4c 04 08       	lea    r9,[r12+rax*1+0x8]
+  4020cd:	41 89 ec             	mov    r12d,ebp
+  4020d0:	49 8d 4c 02 08       	lea    rcx,[r10+rax*1+0x8]
+  4020d5:	49 f7 dc             	neg    r12
+  4020d8:	49 c1 e4 03          	shl    r12,0x3
+  4020dc:	0f 1f 40 00          	nop    DWORD PTR [rax+0x0]
+  4020e0:	4b 8d 34 0c          	lea    rsi,[r12+r9*1]
+  4020e4:	48 89 df             	mov    rdi,rbx
+  4020e7:	66 0f 1f 84 00 00 00 	nop    WORD PTR [rax+rax*1+0x0]
+  4020ee:	00 00 
+  4020f0:	f2 0f 10 0e          	movsd  xmm1,QWORD PTR [rsi]
+  4020f4:	48 89 fa             	mov    rdx,rdi
+  4020f7:	4c 89 d0             	mov    rax,r10
+  4020fa:	66 0f 1f 44 00 00    	nop    WORD PTR [rax+rax*1+0x0]
+  402100:	f2 0f 10 02          	movsd  xmm0,QWORD PTR [rdx]
+  402104:	48 83 c0 08          	add    rax,0x8
+  402108:	48 83 c2 08          	add    rdx,0x8
+  40210c:	f2 0f 59 c1          	mulsd  xmm0,xmm1
+  402110:	f2 0f 58 40 f8       	addsd  xmm0,QWORD PTR [rax-0x8]
+  402115:	f2 0f 11 40 f8       	movsd  QWORD PTR [rax-0x8],xmm0
+  40211a:	48 39 c8             	cmp    rax,rcx
+  40211d:	75 e1                	jne    402100 <matrix_mult+0x80>
+  40211f:	48 83 c6 08          	add    rsi,0x8
+  402123:	4c 01 c7             	add    rdi,r8
+  402126:	49 39 f1             	cmp    r9,rsi
+  402129:	75 c5                	jne    4020f0 <matrix_mult+0x70>
+  40212b:	41 83 c3 01          	add    r11d,0x1
+  40212f:	4d 01 c1             	add    r9,r8
+  402132:	4d 01 c2             	add    r10,r8
+  402135:	4c 01 c1             	add    rcx,r8
+  402138:	44 39 dd             	cmp    ebp,r11d
+  40213b:	75 a3                	jne    4020e0 <matrix_mult+0x60>
+  40213d:	5b                   	pop    rbx
+  40213e:	5d                   	pop    rbp
+  40213f:	41 5c                	pop    r12
+  402141:	c3                   	ret
+  402142:	66 66 2e 0f 1f 84 00 	data16 cs nop WORD PTR [rax+rax*1+0x0]
+  402149:	00 00 00 00 
+  40214d:	0f 1f 00             	nop    DWORD PTR [rax]
+
+0000000000402150 <valid_results>:

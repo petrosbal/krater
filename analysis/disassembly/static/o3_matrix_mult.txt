@@ -1,0 +1,126 @@
+0000000000402450 <matrix_mult>:
+  402450:	41 57                	push   r15
+  402452:	89 c8                	mov    eax,ecx
+  402454:	41 56                	push   r14
+  402456:	0f af c1             	imul   eax,ecx
+  402459:	41 55                	push   r13
+  40245b:	41 54                	push   r12
+  40245d:	49 89 fc             	mov    r12,rdi
+  402460:	55                   	push   rbp
+  402461:	89 cd                	mov    ebp,ecx
+  402463:	53                   	push   rbx
+  402464:	48 89 f3             	mov    rbx,rsi
+  402467:	48 83 ec 28          	sub    rsp,0x28
+  40246b:	48 89 54 24 10       	mov    QWORD PTR [rsp+0x10],rdx
+  402470:	85 c0                	test   eax,eax
+  402472:	74 14                	je     402488 <matrix_mult+0x38>
+  402474:	48 98                	cdqe
+  402476:	48 89 d7             	mov    rdi,rdx
+  402479:	31 f6                	xor    esi,esi
+  40247b:	48 8d 14 c5 00 00 00 	lea    rdx,[rax*8+0x0]
+  402482:	00 
+  402483:	e8 08 ec ff ff       	call   401090 <.plt+0x78>
+  402488:	85 ed                	test   ebp,ebp
+  40248a:	0f 8e 18 01 00 00    	jle    4025a8 <matrix_mult+0x158>
+  402490:	48 8b 7c 24 10       	mov    rdi,QWORD PTR [rsp+0x10]
+  402495:	8d 55 ff             	lea    edx,[rbp-0x1]
+  402498:	41 89 ea             	mov    r10d,ebp
+  40249b:	4c 63 ed             	movsxd r13,ebp
+  40249e:	41 d1 ea             	shr    r10d,1
+  4024a1:	49 89 d7             	mov    r15,rdx
+  4024a4:	48 c1 e2 03          	shl    rdx,0x3
+  4024a8:	41 89 e8             	mov    r8d,ebp
+  4024ab:	4d 8d 74 14 08       	lea    r14,[r12+rdx*1+0x8]
+  4024b0:	48 89 f8             	mov    rax,rdi
+  4024b3:	49 c1 e5 03          	shl    r13,0x3
+  4024b7:	41 83 e0 fe          	and    r8d,0xfffffffe
+  4024bb:	4c 8d 64 17 08       	lea    r12,[rdi+rdx*1+0x8]
+  4024c0:	89 ea                	mov    edx,ebp
+  4024c2:	c7 44 24 0c 00 00 00 	mov    DWORD PTR [rsp+0xc],0x0
+  4024c9:	00 
+  4024ca:	49 c1 e2 04          	shl    r10,0x4
+  4024ce:	48 f7 da             	neg    rdx
+  4024d1:	c7 44 24 08 00 00 00 	mov    DWORD PTR [rsp+0x8],0x0
+  4024d8:	00 
+  4024d9:	48 8d 3c d5 00 00 00 	lea    rdi,[rdx*8+0x0]
+  4024e0:	00 
+  4024e1:	48 89 7c 24 18       	mov    QWORD PTR [rsp+0x18],rdi
+  4024e6:	66 2e 0f 1f 84 00 00 	cs nop WORD PTR [rax+rax*1+0x0]
+  4024ed:	00 00 00 
+  4024f0:	48 8b 7c 24 18       	mov    rdi,QWORD PTR [rsp+0x18]
+  4024f5:	48 89 de             	mov    rsi,rbx
+  4024f8:	4e 8d 1c 37          	lea    r11,[rdi+r14*1]
+  4024fc:	8b 7c 24 0c          	mov    edi,DWORD PTR [rsp+0xc]
+  402500:	41 8d 14 38          	lea    edx,[r8+rdi*1]
+  402504:	48 8b 7c 24 10       	mov    rdi,QWORD PTR [rsp+0x10]
+  402509:	48 63 d2             	movsxd rdx,edx
+  40250c:	48 8d 14 d7          	lea    rdx,[rdi+rdx*8]
+  402510:	31 ff                	xor    edi,edi
+  402512:	66 0f 1f 44 00 00    	nop    WORD PTR [rax+rax*1+0x0]
+  402518:	48 8d 4e 08          	lea    rcx,[rsi+0x8]
+  40251c:	f2 41 0f 10 0b       	movsd  xmm1,QWORD PTR [r11]
+  402521:	48 39 c8             	cmp    rax,rcx
+  402524:	0f 84 96 00 00 00    	je     4025c0 <matrix_mult+0x170>
+  40252a:	41 83 ff 01          	cmp    r15d,0x1
+  40252e:	0f 86 8c 00 00 00    	jbe    4025c0 <matrix_mult+0x170>
+  402534:	66 0f 28 d1          	movapd xmm2,xmm1
+  402538:	31 c9                	xor    ecx,ecx
+  40253a:	66 0f 14 d2          	unpcklpd xmm2,xmm2
+  40253e:	66 90                	xchg   ax,ax
+  402540:	66 0f 10 04 0e       	movupd xmm0,XMMWORD PTR [rsi+rcx*1]
+  402545:	66 0f 10 1c 08       	movupd xmm3,XMMWORD PTR [rax+rcx*1]
+  40254a:	66 0f 59 c2          	mulpd  xmm0,xmm2
+  40254e:	66 0f 58 c3          	addpd  xmm0,xmm3
+  402552:	0f 11 04 08          	movups XMMWORD PTR [rax+rcx*1],xmm0
+  402556:	48 83 c1 10          	add    rcx,0x10
+  40255a:	4c 39 d1             	cmp    rcx,r10
+  40255d:	75 e1                	jne    402540 <matrix_mult+0xf0>
+  40255f:	41 39 e8             	cmp    r8d,ebp
+  402562:	74 18                	je     40257c <matrix_mult+0x12c>
+  402564:	42 8d 0c 07          	lea    ecx,[rdi+r8*1]
+  402568:	f2 0f 10 02          	movsd  xmm0,QWORD PTR [rdx]
+  40256c:	48 63 c9             	movsxd rcx,ecx
+  40256f:	f2 0f 59 0c cb       	mulsd  xmm1,QWORD PTR [rbx+rcx*8]
+  402574:	f2 0f 58 c1          	addsd  xmm0,xmm1
+  402578:	f2 0f 11 02          	movsd  QWORD PTR [rdx],xmm0
+  40257c:	49 83 c3 08          	add    r11,0x8
+  402580:	4c 01 ee             	add    rsi,r13
+  402583:	01 ef                	add    edi,ebp
+  402585:	4d 39 f3             	cmp    r11,r14
+  402588:	75 8e                	jne    402518 <matrix_mult+0xc8>
+  40258a:	83 44 24 08 01       	add    DWORD PTR [rsp+0x8],0x1
+  40258f:	8b 7c 24 08          	mov    edi,DWORD PTR [rsp+0x8]
+  402593:	4d 01 ee             	add    r14,r13
+  402596:	4c 01 e8             	add    rax,r13
+  402599:	01 6c 24 0c          	add    DWORD PTR [rsp+0xc],ebp
+  40259d:	4d 01 ec             	add    r12,r13
+  4025a0:	39 fd                	cmp    ebp,edi
+  4025a2:	0f 85 48 ff ff ff    	jne    4024f0 <matrix_mult+0xa0>
+  4025a8:	48 83 c4 28          	add    rsp,0x28
+  4025ac:	5b                   	pop    rbx
+  4025ad:	5d                   	pop    rbp
+  4025ae:	41 5c                	pop    r12
+  4025b0:	41 5d                	pop    r13
+  4025b2:	41 5e                	pop    r14
+  4025b4:	41 5f                	pop    r15
+  4025b6:	c3                   	ret
+  4025b7:	66 0f 1f 84 00 00 00 	nop    WORD PTR [rax+rax*1+0x0]
+  4025be:	00 00 
+  4025c0:	49 89 f1             	mov    r9,rsi
+  4025c3:	48 89 c1             	mov    rcx,rax
+  4025c6:	66 2e 0f 1f 84 00 00 	cs nop WORD PTR [rax+rax*1+0x0]
+  4025cd:	00 00 00 
+  4025d0:	f2 41 0f 10 01       	movsd  xmm0,QWORD PTR [r9]
+  4025d5:	48 83 c1 08          	add    rcx,0x8
+  4025d9:	49 83 c1 08          	add    r9,0x8
+  4025dd:	f2 0f 59 c1          	mulsd  xmm0,xmm1
+  4025e1:	f2 0f 58 41 f8       	addsd  xmm0,QWORD PTR [rcx-0x8]
+  4025e6:	f2 0f 11 41 f8       	movsd  QWORD PTR [rcx-0x8],xmm0
+  4025eb:	4c 39 e1             	cmp    rcx,r12
+  4025ee:	75 e0                	jne    4025d0 <matrix_mult+0x180>
+  4025f0:	eb 8a                	jmp    40257c <matrix_mult+0x12c>
+  4025f2:	66 66 2e 0f 1f 84 00 	data16 cs nop WORD PTR [rax+rax*1+0x0]
+  4025f9:	00 00 00 00 
+  4025fd:	0f 1f 00             	nop    DWORD PTR [rax]
+
+0000000000402600 <valid_results>:

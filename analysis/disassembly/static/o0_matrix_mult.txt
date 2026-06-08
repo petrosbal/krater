@@ -1,0 +1,93 @@
+0000000000401d1d <matrix_mult>:
+  401d1d:	55                   	push   rbp
+  401d1e:	48 89 e5             	mov    rbp,rsp
+  401d21:	48 89 7d d8          	mov    QWORD PTR [rbp-0x28],rdi
+  401d25:	48 89 75 d0          	mov    QWORD PTR [rbp-0x30],rsi
+  401d29:	48 89 55 c8          	mov    QWORD PTR [rbp-0x38],rdx
+  401d2d:	89 4d c4             	mov    DWORD PTR [rbp-0x3c],ecx
+  401d30:	c7 45 fc 00 00 00 00 	mov    DWORD PTR [rbp-0x4],0x0
+  401d37:	eb 20                	jmp    401d59 <matrix_mult+0x3c>
+  401d39:	8b 45 fc             	mov    eax,DWORD PTR [rbp-0x4]
+  401d3c:	48 98                	cdqe
+  401d3e:	48 8d 14 c5 00 00 00 	lea    rdx,[rax*8+0x0]
+  401d45:	00 
+  401d46:	48 8b 45 c8          	mov    rax,QWORD PTR [rbp-0x38]
+  401d4a:	48 01 d0             	add    rax,rdx
+  401d4d:	66 0f ef c0          	pxor   xmm0,xmm0
+  401d51:	f2 0f 11 00          	movsd  QWORD PTR [rax],xmm0
+  401d55:	83 45 fc 01          	add    DWORD PTR [rbp-0x4],0x1
+  401d59:	8b 45 c4             	mov    eax,DWORD PTR [rbp-0x3c]
+  401d5c:	0f af c0             	imul   eax,eax
+  401d5f:	39 45 fc             	cmp    DWORD PTR [rbp-0x4],eax
+  401d62:	7c d5                	jl     401d39 <matrix_mult+0x1c>
+  401d64:	c7 45 f8 00 00 00 00 	mov    DWORD PTR [rbp-0x8],0x0
+  401d6b:	e9 cf 00 00 00       	jmp    401e3f <matrix_mult+0x122>
+  401d70:	c7 45 f4 00 00 00 00 	mov    DWORD PTR [rbp-0xc],0x0
+  401d77:	e9 b3 00 00 00       	jmp    401e2f <matrix_mult+0x112>
+  401d7c:	8b 45 f8             	mov    eax,DWORD PTR [rbp-0x8]
+  401d7f:	0f af 45 c4          	imul   eax,DWORD PTR [rbp-0x3c]
+  401d83:	89 c2                	mov    edx,eax
+  401d85:	8b 45 f4             	mov    eax,DWORD PTR [rbp-0xc]
+  401d88:	01 d0                	add    eax,edx
+  401d8a:	48 98                	cdqe
+  401d8c:	48 8d 14 c5 00 00 00 	lea    rdx,[rax*8+0x0]
+  401d93:	00 
+  401d94:	48 8b 45 d8          	mov    rax,QWORD PTR [rbp-0x28]
+  401d98:	48 01 d0             	add    rax,rdx
+  401d9b:	f2 0f 10 00          	movsd  xmm0,QWORD PTR [rax]
+  401d9f:	f2 0f 11 45 e8       	movsd  QWORD PTR [rbp-0x18],xmm0
+  401da4:	c7 45 f0 00 00 00 00 	mov    DWORD PTR [rbp-0x10],0x0
+  401dab:	eb 76                	jmp    401e23 <matrix_mult+0x106>
+  401dad:	8b 45 f8             	mov    eax,DWORD PTR [rbp-0x8]
+  401db0:	0f af 45 c4          	imul   eax,DWORD PTR [rbp-0x3c]
+  401db4:	89 c2                	mov    edx,eax
+  401db6:	8b 45 f0             	mov    eax,DWORD PTR [rbp-0x10]
+  401db9:	01 d0                	add    eax,edx
+  401dbb:	48 98                	cdqe
+  401dbd:	48 8d 14 c5 00 00 00 	lea    rdx,[rax*8+0x0]
+  401dc4:	00 
+  401dc5:	48 8b 45 c8          	mov    rax,QWORD PTR [rbp-0x38]
+  401dc9:	48 01 d0             	add    rax,rdx
+  401dcc:	f2 0f 10 08          	movsd  xmm1,QWORD PTR [rax]
+  401dd0:	8b 45 f4             	mov    eax,DWORD PTR [rbp-0xc]
+  401dd3:	0f af 45 c4          	imul   eax,DWORD PTR [rbp-0x3c]
+  401dd7:	89 c2                	mov    edx,eax
+  401dd9:	8b 45 f0             	mov    eax,DWORD PTR [rbp-0x10]
+  401ddc:	01 d0                	add    eax,edx
+  401dde:	48 98                	cdqe
+  401de0:	48 8d 14 c5 00 00 00 	lea    rdx,[rax*8+0x0]
+  401de7:	00 
+  401de8:	48 8b 45 d0          	mov    rax,QWORD PTR [rbp-0x30]
+  401dec:	48 01 d0             	add    rax,rdx
+  401def:	f2 0f 10 00          	movsd  xmm0,QWORD PTR [rax]
+  401df3:	f2 0f 59 45 e8       	mulsd  xmm0,QWORD PTR [rbp-0x18]
+  401df8:	8b 45 f8             	mov    eax,DWORD PTR [rbp-0x8]
+  401dfb:	0f af 45 c4          	imul   eax,DWORD PTR [rbp-0x3c]
+  401dff:	89 c2                	mov    edx,eax
+  401e01:	8b 45 f0             	mov    eax,DWORD PTR [rbp-0x10]
+  401e04:	01 d0                	add    eax,edx
+  401e06:	48 98                	cdqe
+  401e08:	48 8d 14 c5 00 00 00 	lea    rdx,[rax*8+0x0]
+  401e0f:	00 
+  401e10:	48 8b 45 c8          	mov    rax,QWORD PTR [rbp-0x38]
+  401e14:	48 01 d0             	add    rax,rdx
+  401e17:	f2 0f 58 c1          	addsd  xmm0,xmm1
+  401e1b:	f2 0f 11 00          	movsd  QWORD PTR [rax],xmm0
+  401e1f:	83 45 f0 01          	add    DWORD PTR [rbp-0x10],0x1
+  401e23:	8b 45 f0             	mov    eax,DWORD PTR [rbp-0x10]
+  401e26:	3b 45 c4             	cmp    eax,DWORD PTR [rbp-0x3c]
+  401e29:	7c 82                	jl     401dad <matrix_mult+0x90>
+  401e2b:	83 45 f4 01          	add    DWORD PTR [rbp-0xc],0x1
+  401e2f:	8b 45 f4             	mov    eax,DWORD PTR [rbp-0xc]
+  401e32:	3b 45 c4             	cmp    eax,DWORD PTR [rbp-0x3c]
+  401e35:	0f 8c 41 ff ff ff    	jl     401d7c <matrix_mult+0x5f>
+  401e3b:	83 45 f8 01          	add    DWORD PTR [rbp-0x8],0x1
+  401e3f:	8b 45 f8             	mov    eax,DWORD PTR [rbp-0x8]
+  401e42:	3b 45 c4             	cmp    eax,DWORD PTR [rbp-0x3c]
+  401e45:	0f 8c 25 ff ff ff    	jl     401d70 <matrix_mult+0x53>
+  401e4b:	90                   	nop
+  401e4c:	90                   	nop
+  401e4d:	5d                   	pop    rbp
+  401e4e:	c3                   	ret
+
+0000000000401e4f <valid_results>:

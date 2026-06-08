@@ -1,0 +1,93 @@
+00000000000011b5 <matrix_mult>:
+    11b5:	55                   	push   rbp
+    11b6:	48 89 e5             	mov    rbp,rsp
+    11b9:	48 89 7d d8          	mov    QWORD PTR [rbp-0x28],rdi
+    11bd:	48 89 75 d0          	mov    QWORD PTR [rbp-0x30],rsi
+    11c1:	48 89 55 c8          	mov    QWORD PTR [rbp-0x38],rdx
+    11c5:	89 4d c4             	mov    DWORD PTR [rbp-0x3c],ecx
+    11c8:	c7 45 fc 00 00 00 00 	mov    DWORD PTR [rbp-0x4],0x0
+    11cf:	eb 20                	jmp    11f1 <matrix_mult+0x3c>
+    11d1:	8b 45 fc             	mov    eax,DWORD PTR [rbp-0x4]
+    11d4:	48 98                	cdqe
+    11d6:	48 8d 14 c5 00 00 00 	lea    rdx,[rax*8+0x0]
+    11dd:	00 
+    11de:	48 8b 45 c8          	mov    rax,QWORD PTR [rbp-0x38]
+    11e2:	48 01 d0             	add    rax,rdx
+    11e5:	66 0f ef c0          	pxor   xmm0,xmm0
+    11e9:	f2 0f 11 00          	movsd  QWORD PTR [rax],xmm0
+    11ed:	83 45 fc 01          	add    DWORD PTR [rbp-0x4],0x1
+    11f1:	8b 45 c4             	mov    eax,DWORD PTR [rbp-0x3c]
+    11f4:	0f af c0             	imul   eax,eax
+    11f7:	39 45 fc             	cmp    DWORD PTR [rbp-0x4],eax
+    11fa:	7c d5                	jl     11d1 <matrix_mult+0x1c>
+    11fc:	c7 45 f8 00 00 00 00 	mov    DWORD PTR [rbp-0x8],0x0
+    1203:	e9 cf 00 00 00       	jmp    12d7 <matrix_mult+0x122>
+    1208:	c7 45 f4 00 00 00 00 	mov    DWORD PTR [rbp-0xc],0x0
+    120f:	e9 b3 00 00 00       	jmp    12c7 <matrix_mult+0x112>
+    1214:	8b 45 f8             	mov    eax,DWORD PTR [rbp-0x8]
+    1217:	0f af 45 c4          	imul   eax,DWORD PTR [rbp-0x3c]
+    121b:	89 c2                	mov    edx,eax
+    121d:	8b 45 f4             	mov    eax,DWORD PTR [rbp-0xc]
+    1220:	01 d0                	add    eax,edx
+    1222:	48 98                	cdqe
+    1224:	48 8d 14 c5 00 00 00 	lea    rdx,[rax*8+0x0]
+    122b:	00 
+    122c:	48 8b 45 d8          	mov    rax,QWORD PTR [rbp-0x28]
+    1230:	48 01 d0             	add    rax,rdx
+    1233:	f2 0f 10 00          	movsd  xmm0,QWORD PTR [rax]
+    1237:	f2 0f 11 45 e8       	movsd  QWORD PTR [rbp-0x18],xmm0
+    123c:	c7 45 f0 00 00 00 00 	mov    DWORD PTR [rbp-0x10],0x0
+    1243:	eb 76                	jmp    12bb <matrix_mult+0x106>
+    1245:	8b 45 f8             	mov    eax,DWORD PTR [rbp-0x8]
+    1248:	0f af 45 c4          	imul   eax,DWORD PTR [rbp-0x3c]
+    124c:	89 c2                	mov    edx,eax
+    124e:	8b 45 f0             	mov    eax,DWORD PTR [rbp-0x10]
+    1251:	01 d0                	add    eax,edx
+    1253:	48 98                	cdqe
+    1255:	48 8d 14 c5 00 00 00 	lea    rdx,[rax*8+0x0]
+    125c:	00 
+    125d:	48 8b 45 c8          	mov    rax,QWORD PTR [rbp-0x38]
+    1261:	48 01 d0             	add    rax,rdx
+    1264:	f2 0f 10 08          	movsd  xmm1,QWORD PTR [rax]
+    1268:	8b 45 f4             	mov    eax,DWORD PTR [rbp-0xc]
+    126b:	0f af 45 c4          	imul   eax,DWORD PTR [rbp-0x3c]
+    126f:	89 c2                	mov    edx,eax
+    1271:	8b 45 f0             	mov    eax,DWORD PTR [rbp-0x10]
+    1274:	01 d0                	add    eax,edx
+    1276:	48 98                	cdqe
+    1278:	48 8d 14 c5 00 00 00 	lea    rdx,[rax*8+0x0]
+    127f:	00 
+    1280:	48 8b 45 d0          	mov    rax,QWORD PTR [rbp-0x30]
+    1284:	48 01 d0             	add    rax,rdx
+    1287:	f2 0f 10 00          	movsd  xmm0,QWORD PTR [rax]
+    128b:	f2 0f 59 45 e8       	mulsd  xmm0,QWORD PTR [rbp-0x18]
+    1290:	8b 45 f8             	mov    eax,DWORD PTR [rbp-0x8]
+    1293:	0f af 45 c4          	imul   eax,DWORD PTR [rbp-0x3c]
+    1297:	89 c2                	mov    edx,eax
+    1299:	8b 45 f0             	mov    eax,DWORD PTR [rbp-0x10]
+    129c:	01 d0                	add    eax,edx
+    129e:	48 98                	cdqe
+    12a0:	48 8d 14 c5 00 00 00 	lea    rdx,[rax*8+0x0]
+    12a7:	00 
+    12a8:	48 8b 45 c8          	mov    rax,QWORD PTR [rbp-0x38]
+    12ac:	48 01 d0             	add    rax,rdx
+    12af:	f2 0f 58 c1          	addsd  xmm0,xmm1
+    12b3:	f2 0f 11 00          	movsd  QWORD PTR [rax],xmm0
+    12b7:	83 45 f0 01          	add    DWORD PTR [rbp-0x10],0x1
+    12bb:	8b 45 f0             	mov    eax,DWORD PTR [rbp-0x10]
+    12be:	3b 45 c4             	cmp    eax,DWORD PTR [rbp-0x3c]
+    12c1:	7c 82                	jl     1245 <matrix_mult+0x90>
+    12c3:	83 45 f4 01          	add    DWORD PTR [rbp-0xc],0x1
+    12c7:	8b 45 f4             	mov    eax,DWORD PTR [rbp-0xc]
+    12ca:	3b 45 c4             	cmp    eax,DWORD PTR [rbp-0x3c]
+    12cd:	0f 8c 41 ff ff ff    	jl     1214 <matrix_mult+0x5f>
+    12d3:	83 45 f8 01          	add    DWORD PTR [rbp-0x8],0x1
+    12d7:	8b 45 f8             	mov    eax,DWORD PTR [rbp-0x8]
+    12da:	3b 45 c4             	cmp    eax,DWORD PTR [rbp-0x3c]
+    12dd:	0f 8c 25 ff ff ff    	jl     1208 <matrix_mult+0x53>
+    12e3:	90                   	nop
+    12e4:	90                   	nop
+    12e5:	5d                   	pop    rbp
+    12e6:	c3                   	ret
+
+00000000000012e7 <valid_results>:
