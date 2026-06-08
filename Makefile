@@ -51,6 +51,7 @@ teardown-wasm: ## Remove WASM shim binaries - creates clean slate (requires sudo
 
 run: ## Run the full benchmark suite (requires sudo)
 	sudo python3 src/metaorchestrator.py
+	@if [ -n "$(SUDO_UID)" ]; then chown -R $(SUDO_UID):$(SUDO_GID) results/; fi
 
 results-clean: ## Remove the results directory contents (requires sudo)
 	sudo rm -rf results/*
