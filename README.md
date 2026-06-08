@@ -21,7 +21,7 @@ A benchmarking framework for empirical comparison of WebAssembly and Linux conta
 
     * **bench.c**: Benchmark source. Performs matrix multiplication with integrated validity check. Outputs iterations and throughput in MFLOPS.
 
-    * **single_env_bench.py**: A Python orchestrator that handles pod deployment, log parsing, and cgroup resource monitoring for a single execution environment.
+    * **single_env_orch.py**: A Python orchestrator that handles pod deployment, log parsing, and cgroup resource monitoring for a single execution environment.
 
     * **metaorchestrator.py**: The main benchmarking script. Coordinates a benchmark suite across multiple execution environments. It is configured exclusively by `bench_config.yaml`.
 
@@ -127,7 +127,7 @@ make run
 
 *Root privileges are required to read from `/sys/fs/cgroup`.*
 
-The `metaorchestrator.py` script automates the benchmarking process across many environments by executing `single_env_bench.py` for each image in `bench_config.yaml`, using the shared arguments defined below them.
+The `metaorchestrator.py` script automates the benchmarking process across many environments by executing `single_env_orch.py` for each image in `bench_config.yaml`, using the shared arguments defined below them.
 
 These are the pre-defined parameters of the benchmark suite:
 
