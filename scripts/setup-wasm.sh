@@ -8,6 +8,7 @@ BLUE=$'\033[1;36m'
 GREEN=$'\033[1;32m'
 RESET=$'\033[0m'
 
+# install shims
 printf "${BLUE}Installing runwasi v${RUNWASI_VERSION} shims...${RESET}\n"
 for shim in wasmtime wasmedge wasmer; do
     printf "  Downloading containerd-shim-${shim}-v1...\n"
@@ -19,11 +20,13 @@ for shim in wasmtime wasmedge wasmer; do
     printf "  ${GREEN}[ok]${RESET} containerd-shim-${shim}-v1\n"
 done
 
+# this is needed to trigger k3s to pick up the new shims
 printf "${BLUE}Restarting K3s (killall + start)...${RESET}\n"
 k3s-killall.sh
 systemctl start k3s
 
-printf "Waiting for K3s API server"
+# wait for k3s API server to be ready
+printf "Waiting for K3s API server..."
 deadline=$(( $(date +%s) + 120 ))
 until kubectl get nodes >/dev/null 2>&1; do
     if [ "$(date +%s)" -ge "$deadline" ]; then
@@ -35,6 +38,6 @@ until kubectl get nodes >/dev/null 2>&1; do
     printf "."
     sleep 2
 done
-printf " ready\n"
+printf " ready.\n"
 
 printf "${GREEN}Done. Run 'make check-deps' to verify.${RESET}\n"
