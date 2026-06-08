@@ -4,12 +4,12 @@ set -uo pipefail
 GREEN=$'\033[1;32m'
 RESET=$'\033[0m'
 
+D=$(docker images --format "{{.Repository}}:{{.Tag}}")
+K=$(sudo k3s ctr images list)
+
 printf "\n- KRATER IMAGE STATUS -\n"
 printf -- "--------------------------------------------\n"
 printf "%-25s %-11s %-10s\n" "IMAGE" "DOCKER" "K3S"
-
-D=$(docker images --format "{{.Repository}}:{{.Tag}}")
-K=$(sudo k3s ctr images list)
 
 for image in "$@"; do
     d="[    ]"; k="[    ]"; dc="$RESET"; kc="$RESET"
