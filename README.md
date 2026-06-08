@@ -162,6 +162,11 @@ shared_args:
   results_subfolder_name: test_bench
 ```
 
+## Dataset
+
+The raw benchmark datasets used in this thesis are publicly available on Zenodo:
+**https://doi.org/10.5281/zenodo.20600481**
+
 ## Output Results
 
 ```mermaid
