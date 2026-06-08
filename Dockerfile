@@ -2,12 +2,16 @@
 # INTERNAL BUILDERS
 # -----------------
 ARG OPTIMIZATION_LEVEL=3
+# ftp.nl.debian.org avoids Fastly CDN (deb.debian.org), which has poor peering in some regions
+ARG DEBIAN_MIRROR=ftp.nl.debian.org
 
 # --------------------------------------------------------------------
 # -- C builder (native & static) --
 FROM debian:bullseye-20260406-slim AS builder-c
 ARG OPTIMIZATION_LEVEL
-RUN apt-get update && apt-get install -y gcc libc6-dev
+ARG DEBIAN_MIRROR
+RUN sed -i "s/deb.debian.org/${DEBIAN_MIRROR}/g" /etc/apt/sources.list \
+    && apt-get update && apt-get install -y gcc libc6-dev
 WORKDIR /build
 COPY ./src/bench.c .
 
@@ -31,7 +35,9 @@ RUN $CC -O${OPTIMIZATION_LEVEL} -o bench.wasm bench.c -lm
 # -- WASM AOT builder (Universal WASM via wasmedge compile) --
 FROM debian:bullseye-20260406-slim AS builder-wasm-aot
 ARG OPTIMIZATION_LEVEL
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+ARG DEBIAN_MIRROR
+RUN sed -i "s/deb.debian.org/${DEBIAN_MIRROR}/g" /etc/apt/sources.list \
+    && apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 RUN curl -sSfL https://github.com/WasmEdge/WasmEdge/releases/download/0.14.1/WasmEdge-0.14.1-ubuntu20.04_x86_64.tar.gz \
     | tar -xz -C /usr/local --strip-components=1
 WORKDIR /build
