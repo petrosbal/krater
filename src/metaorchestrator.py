@@ -13,6 +13,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""
+This script serves as the main orchestrator for running the benchmarks across multiple environments.
+
+It is responsible for:
+    validating the config, 
+    estimating total duration,
+    sequentially invoking the single_env_orch.py script with the appropriate arguments.
+"""
+
 import yaml
 import subprocess
 import sys
@@ -20,7 +29,7 @@ import re
 from pathlib import Path
 
 YAML_FILE = "src/bench_config.yaml"
-SCRIPT_NAME = "src/single_env_bench.py"
+SCRIPT_NAME = "src/single_env_orch.py"
 PYTHON_EXEC = sys.executable # i use the orchestrator's interpreter for the single env script
 
 WARMUP_DURATION       = 5   # seconds. matches warmup loop in bench.c
@@ -32,6 +41,7 @@ SUFFIX_MAP = [
     ("k",  1000), ("M",  1000**2), ("G",  1000**3), ("T",  1000**4),
 ]
 
+# for the shared_args section of the config
 REQUIRED_SHARED_KEYS = frozenset({
     "results_subfolder_name",
     "sizes",
@@ -44,13 +54,14 @@ REQUIRED_SHARED_KEYS = frozenset({
     "memory",
 })
 
+# for each environment entry in the config
 REQUIRED_ENV_KEYS = frozenset({"image", "runtime_class"})
 
-def load_config(path):
+def load_config(path: str) -> dict:
     with open(path, 'r') as f:
         return yaml.safe_load(f)
 
-def validate_config(config):
+def validate_config(config) -> bool:
     # top-level structure
     if not isinstance(config, dict):
         print("YAML error: config is empty or not a valid mapping")
@@ -144,7 +155,7 @@ def validate_config(config):
 
     return True
 
-def parse_memory_bytes(s):
+def parse_memory_bytes(s: str) -> int:
     s = str(s)
     for suffix, mult in SUFFIX_MAP:
         if s.endswith(suffix):
@@ -154,20 +165,20 @@ def parse_memory_bytes(s):
     except ValueError:
         raise ValueError(f"Unparseable memory value: {s!r}. Expected format: 512Mi, 2Gi, 1024, etc.")
 
-def estimate_duration(config):
+def estimate_duration(config: dict) -> int:
     shared = config['shared_args']
     warmup = WARMUP_DURATION if shared['warmup'] else 0
     per_trial = shared['duration'] + warmup + POD_OVERHEAD_ESTIMATE
-    return len(config['environments']) * len(shared['sizes']) * shared['trials'] * per_trial
+    return int(len(config['environments']) * len(shared['sizes']) * shared['trials'] * per_trial)
 
-def format_duration(seconds):
-    h, rem = divmod(int(seconds), 3600)
+def format_duration(seconds: int) -> str:
+    h, rem = divmod(seconds, 3600)
     m, s = divmod(rem, 60)
     if h > 0: return f"{h}h {m}m"
     if m > 0: return f"{m}m {s}s"
     return f"{s}s"
 
-def construct_command(script_path, shared_args, env_args):
+def construct_command(script_path: str, shared_args: dict, env_args: dict) -> list:
     final_args = {**shared_args, **env_args}
 
     # remove non-script, orchestrator-only arg
@@ -209,7 +220,7 @@ def construct_command(script_path, shared_args, env_args):
 
     return cmd
 
-def run():
+def run() -> None:
     if not Path(YAML_FILE).exists():
         print(f"Config file '{YAML_FILE}' not found.")
         return
