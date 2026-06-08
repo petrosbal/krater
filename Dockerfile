@@ -1,7 +1,7 @@
 # -----------------
 # INTERNAL BUILDERS
 # -----------------
-ARG OPTIMIZATION_LEVEL=0
+ARG OPTIMIZATION_LEVEL=3
 
 # --------------------------------------------------------------------
 # -- C builder (native & static) --
