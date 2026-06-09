@@ -13,7 +13,9 @@
 
 ## Overview
 
-A benchmarking framework for empirical comparison of WebAssembly and Linux container runtime environments in K3s, using cgroup-based resource monitoring and configurable compute workloads. 
+A benchmarking framework for comparing WebAssembly and Linux container runtime environments in K3s, with complete automation, runtime-agnostic cgroup v2 monitoring, per-trial measurement gating and checkpoint-based resumability.
+
+![KRATER Orchestration](docs/orchestration.png)
 
 ## Project Structure
 
@@ -152,6 +154,8 @@ make run
 *Root privileges are required to read from `/sys/fs/cgroup`.*
 
 The `metaorchestrator.py` script automates the benchmarking process across many environments by executing `single_env_orch.py` for each image in `bench_config.yaml`, using the shared arguments defined below them.
+
+![Execution Timeline](docs/execution_timeline.png)
 
 These are the pre-defined parameters of the benchmark suite:
 
