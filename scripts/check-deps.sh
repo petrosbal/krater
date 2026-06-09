@@ -13,7 +13,7 @@ printf -- "--------------------------------------------\n"
 # docker check
 command -v docker >/dev/null 2>&1 \
     && printf "  ${GREEN}[ok]${RESET} docker\n" \
-    || { printf "  ${RED}[!!]${RESET} docker  - not found\n"; missing=1; }
+    || { printf "  ${RED}[!!]${RESET} docker         - not found  (curl -fsSL https://get.docker.com | sh)\n"; missing=1; }
 
 # k3s check and version
 if command -v k3s >/dev/null 2>&1; then
@@ -24,7 +24,7 @@ if command -v k3s >/dev/null 2>&1; then
         printf "  ${RED}[!!]${RESET} k3s - v1.34+ required (found v1.${K3S_MINOR})\n"; missing=1
     fi
 else
-    printf "  ${RED}[!!]${RESET} k3s - not found\n"; missing=1
+    printf "  ${RED}[!!]${RESET} k3s            - not found  (curl -sfL https://get.k3s.io | sh -)\n"; missing=1
 fi
 
 # kubectl check

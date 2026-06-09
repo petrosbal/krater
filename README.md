@@ -27,10 +27,11 @@ A benchmarking framework for empirical comparison of WebAssembly and Linux conta
 
     * **bench_config.yaml**: Single source of truth for benchmark configuration - environments, matrix sizes, trial count, duration, warmup, cgroup sample interval, and output subfolder.
 
-* **Dockerfile**: Multi-stage build file defining three targets:
+* **Dockerfile**: Multi-stage build file defining four targets:
     * `debian`: Standard GCC build (Debian Slim)
     * `static`: Statically linked binary (Scratch)
-    * `wasm`: WebAssembly build using WASI SDK (Scratch).
+    * `wasm`: WebAssembly build using WASI SDK (Scratch)
+    * `wasm-aot`: AOT-compiled WASM via `wasmedge compile` (Universal WASM format, Scratch)
 
 * **Makefile**: Manages the full project lifecycle - dependency checking, WASM shim setup, image building, running the benchmark suite, and cleanup.
 
@@ -60,13 +61,19 @@ curl -fsSL https://get.docker.com | sudo sh
 curl -sfL https://get.k3s.io | sh -
 ```
 
-### 1. Verify dependencies
+### 1. Allow Docker without sudo (optional, needs re-login)
+
+```bash
+make setup-docker
+```
+
+### 2. Verify dependencies
 
 ```bash
 make check-deps
 ```
 
-### 2. Set up WASM support
+### 3. Set up WASM support
 
 Downloads [runwasi](https://github.com/containerd/runwasi) v0.6.0 shim binaries for `wasmtime`, `wasmedge`, and `wasmer`, installs them to `/usr/local/bin/`, and restarts K3s. K3s auto-detects the binaries on startup and registers them with containerd.
 
@@ -74,10 +81,10 @@ Downloads [runwasi](https://github.com/containerd/runwasi) v0.6.0 shim binaries 
 make setup-wasm
 ```
 
-### 3. Build and import images
+### 4. Build and import images
 
 ```bash
-make image-build
+make build-images
 ```
 
 ```mermaid
@@ -99,6 +106,10 @@ flowchart TD
         WasmBuild[build WASM image]
     end
 
+    subgraph WasmAotFlow [WASM AOT]
+        direction TB
+        WasmAotBuild[build AOT WASM image]
+    end
 
     Import[import to k3s containerd]
 
@@ -106,20 +117,33 @@ flowchart TD
     Root --> DebianFlow
     Root --> StaticFlow
     Root --> WasmFlow
+    Root --> WasmAotFlow
 
     %% Converge to single import step
     DebBuild --> Import
     StatBuild --> Import
     WasmBuild --> Import
+    WasmAotBuild --> Import
 ```
-Creates `krater-debian:latest`, `krater-static:latest`, `krater-wasm:latest` and imports them into the K3s containerd registry.
+Creates `krater-debian:latest`, `krater-static:latest`, `krater-wasm:latest`, `krater-wasm-aot:latest` and imports them into the K3s containerd registry.
+
+Verify all images are present in both Docker and K3s:
+```bash
+make status
+```
 
 ### Cleanup
 
-- `make reset` - remove project images from Docker and K3s
-- `make hard-reset` - also removes build tools pulled by Docker during the build
+- `make remove-images` - remove project images from Docker and K3s
+- `make clean-results` - delete the contents of `results/`
+- `make teardown` - full reset: removes images, results, and WASM shims
 
 ## Usage
+
+To edit the benchmark configuration before running:
+```bash
+make config
+```
 
 ```bash
 make run
@@ -149,10 +173,13 @@ environments:
   - image: krater-wasm:latest
     runtime_class: wasmer
 
+  - image: krater-wasm-aot:latest
+    runtime_class: wasmedge
+
 
 shared_args:
   sizes: [256, 1024]
-  trials: 25
+  trials: 30
   duration: 30
   warmup: true
   interval: 0.5
