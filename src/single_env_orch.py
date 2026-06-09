@@ -122,7 +122,7 @@ class CgroupHandler:
             print(f"   [cgroup] file not found during read: {e.filename}")
             return None
         except PermissionError:
-            print(f"   [cgroup] permission denied. are you root?")
+            print("   [cgroup] permission denied. are you root?")
             return None
         except Exception as e:
             print(f"   [cgroup] unexpected error reading stats: {type(e).__name__}: {e}")
@@ -376,7 +376,7 @@ class PodOrchestrator:
         finally:
             watchdog.cancel()
             if "end" not in phase_ts:
-                print(f"   [stream] warning: ended without BENCH_END (timeout or crash)")
+                print("   [stream] warning: ended without BENCH_END (timeout or crash)")
             if monitor_started:
                 stop_event.set()  # hopefully useless. stops monitor on crash/timeout path
                 if t_mon.is_alive():

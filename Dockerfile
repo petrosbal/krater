@@ -11,14 +11,11 @@ FROM debian:bullseye-20260406-slim AS builder-c
 ARG OPTIMIZATION_LEVEL
 ARG DEBIAN_MIRROR
 RUN sed -i "s/deb.debian.org/${DEBIAN_MIRROR}/g" /etc/apt/sources.list \
-    && apt-get update && apt-get install -y gcc libc6-dev
+    && apt-get update && apt-get install -y --no-install-recommends gcc=4:10.2.1-1 libc6-dev=2.31-13+deb11u14
 WORKDIR /build
 COPY ./src/bench.c .
-
-# 1. native compile
-RUN gcc -O${OPTIMIZATION_LEVEL} -o bench_debian bench.c -lm
-# 2. static compile (for the scratch image)
-RUN gcc -O${OPTIMIZATION_LEVEL} -static -o bench_static bench.c -lm
+RUN gcc -O${OPTIMIZATION_LEVEL} -o bench_debian bench.c -lm \
+    && gcc -O${OPTIMIZATION_LEVEL} -static -o bench_static bench.c -lm
 
 # --------------------------------------------------------------------
 # -- WASM builder --
@@ -36,8 +33,9 @@ RUN $CC -O${OPTIMIZATION_LEVEL} -o bench.wasm bench.c -lm
 FROM debian:bullseye-20260406-slim AS builder-wasm-aot
 ARG OPTIMIZATION_LEVEL
 ARG DEBIAN_MIRROR
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN sed -i "s/deb.debian.org/${DEBIAN_MIRROR}/g" /etc/apt/sources.list \
-    && apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+    && apt-get update && apt-get install -y --no-install-recommends curl=7.74.0-1.3+deb11u16 && rm -rf /var/lib/apt/lists/*
 RUN curl -sSfL https://github.com/WasmEdge/WasmEdge/releases/download/0.14.1/WasmEdge-0.14.1-ubuntu20.04_x86_64.tar.gz \
     | tar -xz -C /usr/local --strip-components=1
 WORKDIR /build

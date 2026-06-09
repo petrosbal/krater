@@ -9,19 +9,19 @@ GREEN=$'\033[1;32m'
 RESET=$'\033[0m'
 
 # install shims
-printf "${BLUE}Installing runwasi v${RUNWASI_VERSION} shims...${RESET}\n"
+printf '%sInstalling runwasi v%s shims...%s\n' "${BLUE}" "${RUNWASI_VERSION}" "${RESET}"
 for shim in wasmtime wasmedge wasmer; do
-    printf "  Downloading containerd-shim-${shim}-v1...\n"
+    printf '  Downloading containerd-shim-%s-v1...\n' "${shim}"
     curl -fsSL \
         "https://github.com/containerd/runwasi/releases/download/containerd-shim-${shim}/v${RUNWASI_VERSION}/containerd-shim-${shim}-${ARCH}-linux-musl.tar.gz" \
         -o /tmp/containerd-shim-${shim}.tar.gz
     tar xz -C /usr/local/bin -f /tmp/containerd-shim-${shim}.tar.gz ./containerd-shim-${shim}-v1
     rm /tmp/containerd-shim-${shim}.tar.gz
-    printf "  ${GREEN}[ok]${RESET} containerd-shim-${shim}-v1\n"
+    printf '  %s[ok]%s containerd-shim-%s-v1\n' "${GREEN}" "${RESET}" "${shim}"
 done
 
 # this is needed to trigger k3s to pick up the new shims
-printf "${BLUE}Restarting K3s (killall + start)...${RESET}\n"
+printf '%sRestarting K3s (killall + start)...%s\n' "${BLUE}" "${RESET}"
 k3s-killall.sh
 systemctl start k3s
 
@@ -40,4 +40,4 @@ until kubectl get nodes >/dev/null 2>&1; do
 done
 printf " ready.\n"
 
-printf "${GREEN}Done. Run 'make check-deps' to verify.${RESET}\n"
+printf "%sDone. Run 'make check-deps' to verify.%s\n" "${GREEN}" "${RESET}"
