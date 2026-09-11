@@ -56,6 +56,13 @@ else
     printf "  %s[!!]%s pyyaml         - not found (pip install pyyaml)\n" "${RED}" "${RESET}"; missing=1
 fi
 
+# swipl check
+if command -v swipl >/dev/null 2>&1; then
+    printf "  %s[ok]%s SWI-Prolog\n" "${GREEN}" "${RESET}"
+else
+    printf "  %s[!!]%s SWI-Prolog     - not found\n" "${RED}" "${RESET}"; missing=1
+fi
+
 # shims check
 if test -f /usr/local/bin/containerd-shim-wasmtime-v1 \
     && test -f /usr/local/bin/containerd-shim-wasmedge-v1 \

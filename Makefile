@@ -4,7 +4,7 @@ IMAGES = krater-debian:latest krater-static:latest krater-wasm:latest krater-was
 RUNWASI_VERSION := 0.6.0
 ARCH            := $(shell uname -m)
 
-.PHONY: help build-images remove-images teardown clean-results status setup-wasm teardown-wasm setup-docker run check-deps config
+.PHONY: help build-images dockerfile-generation remove-images teardown clean-results status setup-wasm teardown-wasm setup-docker run check-deps config
 
 BLUE    := \033[1;36m
 GREEN   := \033[1;32m
@@ -15,13 +15,16 @@ RESET   := \033[0m
 
 all: help
 
-build-images: ## Build all variants and import to k3s *
+build-images: ## Build all targets and import to k3s *
 	docker build --target debian -t krater-debian:latest .
 	docker build --target static -t krater-static:latest .
 	docker build --target wasm -t krater-wasm:latest .
 	docker build --target wasm-aot -t krater-wasm-aot:latest .
 	@echo "Importing to k3s..."
 	@bash -o pipefail -c 'docker save $(IMAGES) | sudo k3s ctr images import - > /dev/null'
+
+dockerfile-generation: ## Generate the Dockerfile from build.yaml *
+	@swipl dockerfile_gen/main.pl --arch=$(ARCH)
 
 check-deps: ## Check all required tools are installed
 	@bash scripts/check-deps.sh
