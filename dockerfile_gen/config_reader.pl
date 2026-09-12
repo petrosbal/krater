@@ -217,12 +217,21 @@ build_section_facts(Config, Facts):-
     Facts = [optimization_level(Level)].
 
 % ==============================================================================
+%!  parsed_config(Path, Config).
+%       Succeeds when Config is the parsed content of the file at Path.
+%       Otherwise reports what went wrong and fails.
+parsed_config(Path, Config):-
+    catch(yaml_read(Path, Config), error(Error, _),
+          ( format(user_error, 'cannot read ~w: ~w~n', [Path, Error]),
+            fail )).
+
+% ==============================================================================
 %!  read_config(Path, Facts).
 %       Reads the file at Path and returns the facts it declares. Fails if the
 %       file does not pass valid_config/1, and then returns nothing. This means
 %       a bad file can't load half-way.
 read_config(Path, Facts):-
-    yaml_read(Path, Config),
+    parsed_config(Path, Config),
     valid_config(Config),
     workload_section_facts(Config, WorkloadFacts),
     build_section_facts(Config, BuildFacts),
