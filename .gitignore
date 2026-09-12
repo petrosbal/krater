@@ -4,4 +4,3 @@ __pycache__/
 *.json
 venv/
 .venv/
-analysis/plots/

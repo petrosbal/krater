@@ -16,10 +16,10 @@ RESET   := \033[0m
 all: help
 
 build-images: ## Build all targets and import to k3s *
-	docker build --target debian -t krater-debian:latest .
-	docker build --target static -t krater-static:latest .
-	docker build --target wasm -t krater-wasm:latest .
-	docker build --target wasm-aot -t krater-wasm-aot:latest .
+	docker build -f Dockerfile.gen --target debian -t krater-debian:latest .
+	docker build -f Dockerfile.gen --target static -t krater-static:latest .
+	docker build -f Dockerfile.gen --target wasm -t krater-wasm:latest .
+	docker build -f Dockerfile.gen --target wasm-aot -t krater-wasm-aot:latest .
 	@echo "Importing to k3s..."
 	@bash -o pipefail -c 'docker save $(IMAGES) | sudo k3s ctr images import - > /dev/null'
 

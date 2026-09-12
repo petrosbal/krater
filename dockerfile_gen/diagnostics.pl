@@ -70,7 +70,6 @@ report_problems:-
     format(user_error,
            'cannot derive a Dockerfile, and no known cause matched.~n', []).
 
-
 % ==============================================================================
 %!  explain(Reason).
 %       Prints why the generator refused. rejected_config prints nothing
