@@ -5,6 +5,7 @@
 
 :- module(config_reader, [read_config/2]).
 :- use_module(library(yaml)).
+:- use_module(library(pcre)).
 
 % ==============================================================================
 %!  required_key(Section, Key).
@@ -49,18 +50,37 @@ missing_keys(Section, SectionDict, MissingKeysList):-
                 MissingKeysList).
 
 % ==============================================================================
+%!  key_pattern(Section, Key, Pattern).
+%       The regex a key's value must match in full. A key with no row here
+%       accepts any value.
+key_pattern(target,   name,   "^[a-z][a-z0-9]*(?:(?:[._]|__|-+)[a-z0-9]+)*\\z").
+key_pattern(workload, source,               "^[A-Za-z0-9_][A-Za-z0-9._/-]*\\z").
+key_pattern(build,    optimization_level,                          "^[0-3]\\z").
+
+% ==============================================================================
+%!  malformed_keys(Section, SectionDict, MalformedKeysList).
+%       Succeeds when MalformedKeysList holds the section's keys whose values
+%       do not match their key_pattern/3. Empty when the section is clean.
+malformed_keys(Section, SectionDict, MalformedKeysList):-
+    findall(Key, ( key_pattern(Section, Key, Pattern),
+                   get_dict(Key, SectionDict, Value),
+                   format(string(Text), '~w', [Value]),
+                   \+ re_match(Pattern, Text) ),
+                MalformedKeysList).
+
+% ==============================================================================
 %!  report_keys(Label, Kind, Keys).
 %       Prints one line naming the bad keys. Prints nothing when the list is
 %       empty, so a section with only one kind of problem gets only one line.
-%       The Kind argument in this context is either "unknown" or "missing".
+%       The Kind argument is "unknown", "missing", or "malformed".
 report_keys(_, _, []).
 report_keys(Label, Kind, [Key|Keys]):-
     format(user_error, '~w has ~w keys: ~w~n', [Label, Kind, [Key|Keys]]).
 
 % ==============================================================================
 %!  valid_section(Label, Section, SectionDict).
-%       Succeeds when the section is a mapping with no unknown keys and no
-%       missing keys. Otherwise reports what is wrong and fails, with Label
+%       Succeeds when the section is a mapping with no unknown, missing, or
+%       malformed keys. Otherwise reports what is wrong and fails, with Label
 %       naming the error's location in the file. The two argument form uses the
 %       section name as the label.
 valid_section(Section, SectionDict):-
@@ -74,13 +94,16 @@ valid_section(Label, _, SectionDict):-
 valid_section(_, Section, SectionDict):-
     unknown_keys(Section, SectionDict, []),
     missing_keys(Section, SectionDict, []),
+    malformed_keys(Section, SectionDict, []),
     !.
 
 valid_section(Label, Section, SectionDict):-
     unknown_keys(Section, SectionDict, UnknownKeys),
     missing_keys(Section, SectionDict, MissingKeys),
+    malformed_keys(Section, SectionDict, MalformedKeys),
     report_keys(Label, unknown, UnknownKeys),
     report_keys(Label, missing, MissingKeys),
+    report_keys(Label, malformed, MalformedKeys),
     fail.
 
 % ==============================================================================
