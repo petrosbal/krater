@@ -20,7 +20,8 @@
                         toolchain_binary/2,
                         optimization_syntax/2,
                         toolchain_asset/3,
-                        duplicate_targets/2 ]).
+                        duplicate_targets/2,
+                        stage_name_collision/1 ]).
 :- use_module(library(ugraphs)).
 :- use_module(build_facts).
 
@@ -144,6 +145,17 @@ stage_name(builder(Toolchain), Name):-
     atomic_list_concat(['builder_', Toolchain], Name).
 
 stage_name(final(Target), Target).
+
+% ==============================================================================
+%!  stage_name_collision(Name).
+%       Succeeds when a target is named like a builder stage that exists. Only
+%       final against builder names can clash, because builder names come from
+%       distinct toolchains, and target names are already distinct.
+stage_name_collision(Name):-
+    target(Target),
+    stage_steps(Toolchain, _),
+    stage_name(final(Target), Name),
+    stage_name(builder(Toolchain), Name).
 
 % ==============================================================================
 %!  toolchain_release(Toolchain, Version).

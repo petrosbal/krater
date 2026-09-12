@@ -59,6 +59,11 @@ problem(Message):-
     format(atom(Message), 'target ~w and ~w build the same artifact',
                           [Target, Other]).
 
+problem(Message):-
+    stage_name_collision(Name),
+    format(atom(Message), 'target ~w has the same name as a builder stage',
+                          [Name]).
+
 % ==============================================================================
 %!  report_problems.
 %       Prints every problem found, one per line. Says so plainly when the

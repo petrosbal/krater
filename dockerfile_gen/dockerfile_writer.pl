@@ -99,6 +99,7 @@ render_header(OutStream):-
 %       per builder stage, then one block per target.
 render_dockerfile(OutStream):-
     not(duplicate_targets(_, _)),
+    not(stage_name_collision(_)),
     render_header(OutStream),
     stage_order(Toolchains),
     forall(member(Toolchain, Toolchains),
