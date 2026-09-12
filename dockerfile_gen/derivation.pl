@@ -19,7 +19,8 @@
                         target_steps/2,
                         toolchain_binary/2,
                         optimization_syntax/2,
-                        toolchain_asset/3 ]).
+                        toolchain_asset/3,
+                        duplicate_targets/2 ]).
 :- use_module(library(ugraphs)).
 :- use_module(build_facts).
 
@@ -51,14 +52,15 @@ toolchain_supports(rustc, link_mode, 'dynamic').
 toolchain_supports(rustc, link_mode, static).
 
 % ==============================================================================
-%!  target_attribute(Target, Attribute, Value).
-%       Succeeds when the target declares the attribute and its toolchain
-%       accepts that value. A declared value the toolchain does not support has
-%       no answer here, so nothing downstream can derive from it.
-target_attribute(Target, Attribute, Value):-
-    call(Attribute, Target, Value),
+%!  target_attributes_supported(Target).
+%       Succeeds when every attribute the target declares is supported by its
+%       toolchain. The attributes checked are those toolchain_supports/3 has
+%       rows for.
+target_attributes_supported(Target):-
     target_toolchain(Target, Toolchain),
-    toolchain_supports(Toolchain, Attribute, Value).
+    forall(( toolchain_supports(_, Attribute, _),
+             call(Attribute, Target, Value) ),
+           toolchain_supports(Toolchain, Attribute, Value)).
 
 % ==============================================================================
 %!  target_modifier(Target, Modifier).
@@ -66,7 +68,7 @@ target_attribute(Target, Attribute, Value):-
 %       (other than the optimization level). Clause order fixes the order of
 %       the collected list.
 target_modifier(Target, static):-
-    target_attribute(Target, link_mode, static).
+    link_mode(Target, static).
 
 % ==============================================================================
 %!  target_compile_step(Target, Step).
@@ -74,6 +76,7 @@ target_modifier(Target, static):-
 %       source. Two targets compiled the same way get the same term, so the
 %       stage runs the command once.
 target_compile_step(Target, compile(Toolchain, CodeFormat, Modifiers)):-
+    target_attributes_supported(Target),
     code_format(Target, CodeFormat),
     target_toolchain(Target, Toolchain),
     findall(Modifier, target_modifier(Target, Modifier), Modifiers).
@@ -90,7 +93,7 @@ target_steps(Target, [Step]):-
 
 target_steps(Target, [Step, aot(Compiler, Step)]):-
     target_compile_step(Target, Step),
-    target_attribute(Target, aot_compiler, Compiler).
+    aot_compiler(Target, Compiler).
 
 % ==============================================================================
 %!  target_last_step(Target, Step).
@@ -100,6 +103,16 @@ target_steps(Target, [Step, aot(Compiler, Step)]):-
 target_last_step(Target, Step):-
     target_steps(Target, Steps),
     last(Steps, Step).
+
+% ==============================================================================
+%!  duplicate_targets(Target, Other).
+%       Succeeds when two differently named targets end in the same build step.
+%       They would ship one artifact under two different names, which is
+%       probably not what the user intended.
+duplicate_targets(Target, Other):-
+    target_last_step(Target, Step),
+    target_last_step(Other, Step),
+    Target @< Other.
 
 % ==============================================================================
 %!  step_toolchain(Step, Toolchain).
@@ -310,7 +323,7 @@ target_entrypoint(Target, Path):-
 %       Succeeds when the target is a self-contained executable (static and wasm
 %       targets).
 target_self_contained(Target):-
-    target_attribute(Target, link_mode, static).
+    link_mode(Target, static).
 
 target_self_contained(Target):-
     code_format(Target, wasm).
@@ -323,7 +336,7 @@ target_base_image(Target, scratch):-
     target_self_contained(Target).
 
 target_base_image(Target, 'debian:trixie-slim'):-
-    target_attribute(Target, link_mode, 'dynamic').
+    link_mode(Target, 'dynamic').
 
 % ==============================================================================
 %!  optimization_syntax(Toolchain, Prefix).

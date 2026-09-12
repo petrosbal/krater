@@ -98,6 +98,7 @@ render_header(OutStream):-
 %       Renders the whole Dockerfile to OutStream: the header, then one block
 %       per builder stage, then one block per target.
 render_dockerfile(OutStream):-
+    not(duplicate_targets(_, _)),
     render_header(OutStream),
     stage_order(Toolchains),
     forall(member(Toolchain, Toolchains),

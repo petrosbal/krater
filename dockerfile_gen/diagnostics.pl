@@ -54,6 +54,11 @@ problem(Message):-
     format(atom(Message), 'target ~w has no base image',
                           [Target]).
 
+problem(Message):-
+    duplicate_targets(Target, Other),
+    format(atom(Message), 'target ~w and ~w build the same artifact',
+                          [Target, Other]).
+
 % ==============================================================================
 %!  report_problems.
 %       Prints every problem found, one per line. Says so plainly when the
