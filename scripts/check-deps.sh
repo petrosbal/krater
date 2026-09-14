@@ -63,6 +63,20 @@ else
     printf "  %s[!!]%s SWI-Prolog     - not found\n" "${RED}" "${RESET}"; missing=1
 fi
 
+# swipl yaml and pcre check
+if command -v swipl >/dev/null 2>&1; then
+    if swipl -g 'use_module(library(yaml)), yaml_read(string("a: 1"), _)' -t halt >/dev/null 2>&1; then
+        printf "  %s[ok]%s SWI-Prolog yaml\n" "${GREEN}" "${RESET}"
+    else
+        printf "  %s[!!]%s SWI-Prolog yaml - not usable (swi-prolog-nox, libyaml)\n" "${RED}" "${RESET}"; missing=1
+    fi
+    if swipl -g 'use_module(library(pcre)), re_match("a", "a")' -t halt >/dev/null 2>&1; then
+        printf "  %s[ok]%s SWI-Prolog pcre\n" "${GREEN}" "${RESET}"
+    else
+        printf "  %s[!!]%s SWI-Prolog pcre - not usable (swi-prolog-nox, libpcre2-8)\n" "${RED}" "${RESET}"; missing=1
+    fi
+fi
+
 # shims check
 if test -f /usr/local/bin/containerd-shim-wasmtime-v1 \
     && test -f /usr/local/bin/containerd-shim-wasmedge-v1 \
