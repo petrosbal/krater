@@ -34,7 +34,8 @@ or_refuse(_, Reason):-
 %       Reads the command line args, puts the facts in place, and writes the
 %       Dockerfile. Throws refused/1 at each point that can have no answer.
 generate(Argv):-
-    argv_options(Argv, _, Options),
+    argv_options(Argv, Positional, Options),
+    or_refuse(Positional == [], unexpected_arguments(Positional)),
     or_refuse(option(architecture(Architecture), Options), no_architecture),
     option(config(ConfigPath), Options, 'build.yaml'),
     option(output(OutputPath), Options, 'Dockerfile.gen'),

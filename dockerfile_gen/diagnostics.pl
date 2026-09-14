@@ -83,8 +83,7 @@ report_problems:-
 % ==============================================================================
 %!  explain(Reason).
 %       Prints why the generator refused. rejected_config prints nothing
-%       deliberately: config_reader has already named the offending key, and a
-%       second line would only restate it.
+%       deliberately, because config_reader has already named the offending key.
 explain(no_architecture):-
     format(user_error, '--arch is required, for example --arch=x86_64~n', []).
 
@@ -93,3 +92,5 @@ explain(rejected_config).
 explain(underivable):-
     report_problems.
 
+explain(unexpected_arguments(Arguments)):-
+    format(user_error, 'unexpected arguments: ~w~n', [Arguments]).
