@@ -10,13 +10,18 @@
 :- use_module(derivation).
 
 % ==============================================================================
-%!  toolchain_requirement(Table, Description).
-%       Every table a toolchain must have a row in before its stage can be
-%       built.
-toolchain_requirement(builder_image,       'base image').
-toolchain_requirement(toolchain_binary,    'compiler binary').
-toolchain_requirement(optimization_syntax, 'optimization flag syntax').
-toolchain_requirement(stage_setup,         'setup list').
+%!  toolchain_requirement(Toolchain, Requirement, Description).
+%       The goals a toolchain must satisfy before its stage can be built, each
+%       with a description message.
+toolchain_requirement(Toolchain, builder_image(Toolchain, _),
+                        'base image').
+toolchain_requirement(Toolchain, toolchain_binary(Toolchain, _),
+                        'compiler binary').
+toolchain_requirement(Toolchain, optimization_syntax(Toolchain, _),
+                        'optimization flag syntax').
+toolchain_requirement(wasmedge, ( architecture(Architecture),
+                                  toolchain_asset(wasmedge, Architecture, _) ),
+                        'release asset for this architecture').
 
 % ==============================================================================
 %!  problem(Message).
@@ -25,11 +30,19 @@ toolchain_requirement(stage_setup,         'setup list').
 %       toolchain it is missing for.
 problem(Message):-
     stage_steps(Toolchain, _),
-    toolchain_requirement(Table, Description),
-    Goal =.. [Table, Toolchain, _],
-    \+ call(Goal),
-    format(atom(Message), 'toolchain ~w has no ~w: ~w has no row for it',
-                          [Toolchain, Description, Table]).
+    toolchain_requirement(Toolchain, Requirement, Description),
+    \+ Requirement,
+    numbervars(Requirement, 0, _, [singletons(true)]), % for readability
+    format(atom(Message), 'toolchain ~w has no ~w: ~W fails',
+            [Toolchain, Description, Requirement,
+             [numbervars(true), quoted(true), spacing(next_argument)]]).
+
+problem(Message):-
+    stage_steps(Toolchain, _),
+    \+ stage_setup(Toolchain, _),
+    forall(toolchain_requirement(Toolchain, Requirement, _), Requirement),
+    format(atom(Message), 'toolchain ~w has no setup list: stage_setup/2 fails',
+                          [Toolchain]).
 
 problem(Message):-
     target(Target),
