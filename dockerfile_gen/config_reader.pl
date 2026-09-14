@@ -58,31 +58,74 @@ key_pattern(workload, source,               "^[A-Za-z0-9_][A-Za-z0-9._/-]*\\z").
 key_pattern(build,    optimization_level,                          "^[0-3]\\z").
 
 % ==============================================================================
-%!  malformed_keys(Section, SectionDict, MalformedKeysList).
-%       Succeeds when MalformedKeysList holds the section's keys whose values
-%       do not match their key_pattern/3. Empty when the section is clean.
-malformed_keys(Section, SectionDict, MalformedKeysList):-
+%!  malformed_values(Section, SectionDict, MalformedValueKeysList).
+%       Succeeds when MalformedValueKeysList holds the section's keys whose
+%       values do not match their key_pattern/3. Empty when the section is
+%       clean.
+malformed_values(Section, SectionDict, MalformedValueKeysList):-
     findall(Key, ( key_pattern(Section, Key, Pattern),
                    get_dict(Key, SectionDict, Value),
                    format(string(Text), '~w', [Value]),
                    \+ re_match(Pattern, Text) ),
-                MalformedKeysList).
+                MalformedValueKeysList).
 
 % ==============================================================================
-%!  report_keys(Label, Kind, Keys).
+%!  value_shape(Value, Shape).
+%       Succeeds when Shape is the shape of one parsed YAML value (list,
+%       mapping, or scalar).
+value_shape(Value, list):-
+    is_list(Value), !.
+
+value_shape(Value, mapping):-
+    is_dict(Value), !.
+
+value_shape(Value, scalar):-
+    not(is_list(Value)), not(is_dict(Value)), !.
+
+% ==============================================================================
+%!  key_shape(Section, Key, Shape).
+%       The keys whose value is not a scalar. A key with no row here is scalar.
+key_shape(config, workload, mapping).
+key_shape(config, build, mapping).
+key_shape(config, targets, list).
+
+% ==============================================================================
+%!  key_expected_shape(Section, Key, Shape).
+%       Succeeds when Shape is the shape a key's value must have: its
+%       key_shape/3 row, or scalar when it has none.
+key_expected_shape(Section, Key, Shape):-
+    key_shape(Section, Key, Shape).
+
+key_expected_shape(Section, Key, scalar):-
+    not(key_shape(Section, Key, _)).
+
+% ==============================================================================
+%!  misshapen_values(Section, SectionDict, MisshapenValueKeysList).
+%       Succeeds when MisshapenValueKeysList holds the section's keys whose
+%       values do not have their key_expected_shape/3. Empty when the section
+%       is clean.
+misshapen_values(Section, SectionDict, MisshapenValueKeysList):-
+    findall(Key, (get_dict(Key, SectionDict, Value),
+                  value_shape(Value, Shape),
+                  not(key_expected_shape(Section, Key, Shape))),
+                MisshapenValueKeysList).
+
+% ==============================================================================
+%!  report_keys(Label, Fault, Keys).
 %       Prints one line naming the bad keys. Prints nothing when the list is
-%       empty, so a section with only one kind of problem gets only one line.
-%       The Kind argument is "unknown", "missing", or "malformed".
+%       empty, so a section with only one kind of fault gets only one line.
+%       Fault is the phrase before the keys, such as 'unknown keys' or
+%       'malformed values in'.
 report_keys(_, _, []).
-report_keys(Label, Kind, [Key|Keys]):-
-    format(user_error, '~w has ~w keys: ~w~n', [Label, Kind, [Key|Keys]]).
+report_keys(Label, Fault, [Key|Keys]):- % at least one key
+    format(user_error, '~w has ~w: ~w~n', [Label, Fault, [Key|Keys]]).
 
 % ==============================================================================
 %!  valid_section(Label, Section, SectionDict).
-%       Succeeds when the section is a mapping with no unknown, missing, or
-%       malformed keys. Otherwise reports what is wrong and fails, with Label
-%       naming the error's location in the file. The two argument form uses the
-%       section name as the label.
+%       Succeeds when the section is a mapping with no unknown or missing keys
+%       and no malformed or misshapen values. Otherwise reports what is wrong
+%       and fails, with Label naming the error's location in the file. The two
+%       argument form uses the section name as the label.
 valid_section(Section, SectionDict):-
     valid_section(Section, Section, SectionDict).
 
@@ -94,16 +137,21 @@ valid_section(Label, _, SectionDict):-
 valid_section(_, Section, SectionDict):-
     unknown_keys(Section, SectionDict, []),
     missing_keys(Section, SectionDict, []),
-    malformed_keys(Section, SectionDict, []),
+    malformed_values(Section, SectionDict, []),
+    misshapen_values(Section, SectionDict, []),
     !.
 
 valid_section(Label, Section, SectionDict):-
     unknown_keys(Section, SectionDict, UnknownKeys),
     missing_keys(Section, SectionDict, MissingKeys),
-    malformed_keys(Section, SectionDict, MalformedKeys),
-    report_keys(Label, unknown, UnknownKeys),
-    report_keys(Label, missing, MissingKeys),
-    report_keys(Label, malformed, MalformedKeys),
+    misshapen_values(Section, SectionDict, MisshapenValueKeys),
+    malformed_values(Section, SectionDict, MalformedValueKeys),
+    report_keys(Label, 'unknown keys', UnknownKeys),
+    report_keys(Label, 'missing keys', MissingKeys),
+    subtract(MisshapenValueKeys, UnknownKeys, ReportedMisshapenValueKeys),
+    report_keys(Label, 'misshapen values in', ReportedMisshapenValueKeys),
+    subtract(MalformedValueKeys, MisshapenValueKeys, ReportedMalformedValueKeys),
+    report_keys(Label, 'malformed values in', ReportedMalformedValueKeys),
     fail.
 
 % ==============================================================================
@@ -112,11 +160,6 @@ valid_section(Label, Section, SectionDict):-
 %       valid. The label is the target's index, so a message says which target
 %       is wrong. It cannot be the target's name, because a missing name is one
 %       of the errors.
-valid_targets(Targets):-
-    not(is_list(Targets)),
-    format(user_error, 'targets must be a list~n', []),
-    !, fail.
-
 valid_targets([]):-
     format(user_error, 'targets list must not be empty~n', []),
     !, fail.
