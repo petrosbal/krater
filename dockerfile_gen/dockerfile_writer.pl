@@ -4,6 +4,7 @@
 %%% Renders the Dockerfile contents and writes them to a file.
 
 :- module(dockerfile_writer, [write_dockerfile/1]).
+:- use_module(library(lists), [member/2]).
 :- use_module(derivation).
 :- use_module(build_facts).
 

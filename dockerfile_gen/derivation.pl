@@ -22,7 +22,8 @@
                         toolchain_asset/3,
                         duplicate_targets/2,
                         stage_name_collision/1 ]).
-:- use_module(library(ugraphs)).
+:- use_module(library(lists), [append/2, member/2, last/2]).
+:- use_module(library(ugraphs), [top_sort/2, vertices_edges_to_ugraph/3]).
 :- use_module(build_facts).
 
 % ==============================================================================

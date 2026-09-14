@@ -6,6 +6,7 @@
 %%% the path of a successful run.
 
 :- module(diagnostics, [explain/1]).
+:- use_module(library(lists), [member/2]).
 :- use_module(build_facts).
 :- use_module(derivation).
 
@@ -56,16 +57,13 @@ problem(Message):-
     target(Target),
     target_toolchain(Target, _),
     \+ target_steps(Target, _),
-    format(atom(Message),
-        'target ~w has no build pipeline',
-        [Target]).
+    format(atom(Message), 'target ~w has no build pipeline', [Target]).
 
 problem(Message):-
     target(Target),
     target_steps(Target, _),
     \+ target_base_image(Target, _),
-    format(atom(Message), 'target ~w has no base image',
-                          [Target]).
+    format(atom(Message), 'target ~w has no base image',[Target]).
 
 problem(Message):-
     duplicate_targets(Target, Other),
@@ -86,8 +84,7 @@ report_problems:-
     setof(Message, problem(Message), Messages),
     format(user_error, 'cannot derive a Dockerfile:~n', []),
     forall(member(Message, Messages),
-           format(user_error, '  ~w~n', [Message])),
-    !.
+           format(user_error, '  ~w~n', [Message])), !.
 
 report_problems:-
     format(user_error,

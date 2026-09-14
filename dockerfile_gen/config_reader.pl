@@ -4,8 +4,11 @@
 %%% Reads build.yaml, checks it, and returns its content as Prolog facts.
 
 :- module(config_reader, [read_config/2]).
-:- use_module(library(yaml)).
-:- use_module(library(pcre)).
+:- use_module(library(apply), [maplist/3]).
+:- use_module(library(dicts), [dict_keys/2]).
+:- use_module(library(lists), [append/2, is_set/1, member/2, subtract/3]).
+:- use_module(library(yaml), [yaml_read/2]).
+:- use_module(library(pcre), [re_match/2]).
 
 % ==============================================================================
 %!  required_key(Section, Key).

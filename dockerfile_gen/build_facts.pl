@@ -12,6 +12,7 @@
                          optimization_level/1,
                          architecture/1,
                          load_build_facts/2]).
+:- use_module(library(apply), [maplist/2]).
 :- use_module(config_reader).
 
 % ==============================================================================

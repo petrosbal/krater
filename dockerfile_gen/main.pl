@@ -2,8 +2,8 @@
 %%%
 %%% The entry point of the Dockerfile generator pipeline.
 
-:- use_module(library(main)).
-:- use_module(library(option)).
+:- use_module(library(main), [argv_options/3, main/0]).
+:- use_module(library(option), [option/2, option/3]).
 :- use_module(build_facts).
 :- use_module(dockerfile_writer).
 :- use_module(diagnostics).
