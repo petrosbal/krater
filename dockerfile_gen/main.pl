@@ -19,6 +19,20 @@ opt_type(config, config, atom).
 opt_type(output, output, atom).
 
 % ==============================================================================
+%!  opt_help(Fact, Help).
+%       The description --help prints for each command line option.
+opt_help(architecture, "Target architecture, e.g. x86_64 or aarch64").
+opt_help(config, "Build config to read (default: build.yaml)").
+opt_help(output, "Dockerfile to write (default: Dockerfile.gen)").
+
+% ==============================================================================
+%!  opt_meta(Fact, Placeholder).
+%       The placeholder that --help prints for each command line option.
+opt_meta(architecture, "ARCH").
+opt_meta(config, "FILE").
+opt_meta(output, "FILE").
+
+% ==============================================================================
 %!  or_refuse(Goal, Reason).
 %       Runs Goal, and throws refused(Reason) when it has no solution. The one
 %       place a step with no answer becomes something main/1 can act on.
