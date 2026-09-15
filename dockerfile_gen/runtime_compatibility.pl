@@ -5,7 +5,7 @@
 %%% clause here is one that must not reach the harness. Nothing here generates
 %%% anything.
 
-:- module(runtime_compatibility, [runs_under/2]).
+:- module(runtime_compatibility, [environment/2]).
 :- use_module(build_facts).
 
 % ==============================================================================
@@ -39,3 +39,18 @@ runs_under(Target, Runtime):-
     code_format(Target, wasm),
     not(aot_compiler(Target, _)),
     wasm_shim(Runtime).
+
+% ==============================================================================
+%!  target_image_name(Target, ImageName).
+%       Succeeds when ImageName is the name of the image the target runs in.
+target_image_name(Target, ImageName):-
+    atomic_list_concat([krater, ':', Target], ImageName).
+
+% ==============================================================================
+%!  environment(ImageName, RuntimeClass).
+%       Succeeds when ImageName is the name of the image the target runs in, and
+%       RuntimeClass is the runtime class it may execute under.
+environment(ImageName, RuntimeClass):-
+    target(Target),
+    runs_under(Target, RuntimeClass),
+    target_image_name(Target, ImageName).

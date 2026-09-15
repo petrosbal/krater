@@ -29,10 +29,10 @@ check_generator_runs_without_autoload() {
         -- --arch=x86_64
 }
 
-check_dockerfile_is_current() {
-    git diff --exit-code Dockerfile.gen
+check_generated_files_are_current() {
+    git diff --exit-code dockerfile_gen/generated/
 }
 
 check_modules_load_cleanly
 check_generator_runs_without_autoload
-check_dockerfile_is_current
+check_generated_files_are_current

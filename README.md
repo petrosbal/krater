@@ -29,7 +29,7 @@ A benchmarking framework for comparing WebAssembly and Linux container runtime e
 
     * **bench_config.yaml**: Single source of truth for benchmark configuration - environments, matrix sizes, trial count, duration, warmup, cgroup sample interval, and output subfolder.
 
-* **Dockerfile.gen**: Multi-stage build file, generated from `build.yaml`, defining four targets:
+* **dockerfile_gen/generated/Dockerfile**: Multi-stage build file, generated from `build.yaml`, defining four targets:
     * `native`: GCC, dynamically linked (Debian Slim)
     * `native-static`: GCC, statically linked (Scratch)
     * `wasm`: WebAssembly build using WASI SDK (Scratch)

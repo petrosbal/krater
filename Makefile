@@ -16,14 +16,14 @@ RESET   := \033[0m
 all: help
 
 build-images: ## Build all targets and import to k3s *
-	docker build -f Dockerfile.gen --target native -t krater:native .
-	docker build -f Dockerfile.gen --target native-static -t krater:native-static .
-	docker build -f Dockerfile.gen --target wasm -t krater:wasm .
-	docker build -f Dockerfile.gen --target wasm-aot -t krater:wasm-aot .
+	docker build -f dockerfile_gen/generated/Dockerfile --target native -t krater:native .
+	docker build -f dockerfile_gen/generated/Dockerfile --target native-static -t krater:native-static .
+	docker build -f dockerfile_gen/generated/Dockerfile --target wasm -t krater:wasm .
+	docker build -f dockerfile_gen/generated/Dockerfile --target wasm-aot -t krater:wasm-aot .
 	@echo "Importing to k3s..."
 	@bash -o pipefail -c 'docker save $(IMAGES) | sudo k3s ctr images import - > /dev/null'
 
-dockerfile-generation: ## Generate the Dockerfile from build.yaml *
+dockerfile-generation: ## Generate dockerfile_gen/generated/ from build.yaml *
 	@swipl dockerfile_gen/main.pl --arch=$(ARCH)
 
 check-deps: ## Check all required tools are installed

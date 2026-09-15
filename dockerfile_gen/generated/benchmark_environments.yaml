@@ -1,0 +1,21 @@
+# Automatically generated from build.yaml with the power of Prolog.
+# You probably don't want to edit this file.
+
+environments:
+  - image: krater:native
+    runtime_class: default
+
+  - image: krater:native-static
+    runtime_class: default
+
+  - image: krater:wasm
+    runtime_class: wasmtime
+
+  - image: krater:wasm
+    runtime_class: wasmedge
+
+  - image: krater:wasm
+    runtime_class: wasmer
+
+  - image: krater:wasm-aot
+    runtime_class: wasmedge
