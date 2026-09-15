@@ -1,5 +1,5 @@
 export DOCKER_BUILDKIT=1
-IMAGES = krater-debian:latest krater-static:latest krater-wasm:latest krater-wasm-aot:latest
+IMAGES = krater:native krater:native-static krater:wasm krater:wasm-aot
 
 RUNWASI_VERSION := 0.6.0
 ARCH            := $(shell uname -m)
@@ -16,10 +16,10 @@ RESET   := \033[0m
 all: help
 
 build-images: ## Build all targets and import to k3s *
-	docker build -f Dockerfile.gen --target debian -t krater-debian:latest .
-	docker build -f Dockerfile.gen --target static -t krater-static:latest .
-	docker build -f Dockerfile.gen --target wasm -t krater-wasm:latest .
-	docker build -f Dockerfile.gen --target wasm-aot -t krater-wasm-aot:latest .
+	docker build -f Dockerfile.gen --target native -t krater:native .
+	docker build -f Dockerfile.gen --target native-static -t krater:native-static .
+	docker build -f Dockerfile.gen --target wasm -t krater:wasm .
+	docker build -f Dockerfile.gen --target wasm-aot -t krater:wasm-aot .
 	@echo "Importing to k3s..."
 	@bash -o pipefail -c 'docker save $(IMAGES) | sudo k3s ctr images import - > /dev/null'
 

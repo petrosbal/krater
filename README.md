@@ -29,9 +29,9 @@ A benchmarking framework for comparing WebAssembly and Linux container runtime e
 
     * **bench_config.yaml**: Single source of truth for benchmark configuration - environments, matrix sizes, trial count, duration, warmup, cgroup sample interval, and output subfolder.
 
-* **Dockerfile**: Multi-stage build file defining four targets:
-    * `debian`: Standard GCC build (Debian Slim)
-    * `static`: Statically linked binary (Scratch)
+* **Dockerfile.gen**: Multi-stage build file, generated from `build.yaml`, defining four targets:
+    * `native`: GCC, dynamically linked (Debian Slim)
+    * `native-static`: GCC, statically linked (Scratch)
     * `wasm`: WebAssembly build using WASI SDK (Scratch)
     * `wasm-aot`: AOT-compiled WASM via `wasmedge compile` (Universal WASM format, Scratch)
 
@@ -93,14 +93,14 @@ make build-images
 flowchart TD
     Root[make image-build]
 
-    subgraph DebianFlow [Debian]
+    subgraph DebianFlow [Native]
         direction TB
-        DebBuild[build standard image]
+        DebBuild[build native image]
     end
 
-    subgraph StaticFlow [Static]
+    subgraph StaticFlow [Native static]
         direction TB
-        StatBuild[build static binary image]
+        StatBuild[build native-static image]
     end
 
     subgraph WasmFlow [WASM]
@@ -127,7 +127,7 @@ flowchart TD
     WasmBuild --> Import
     WasmAotBuild --> Import
 ```
-Creates `krater-debian:latest`, `krater-static:latest`, `krater-wasm:latest`, `krater-wasm-aot:latest` and imports them into the K3s containerd registry.
+Creates `krater:native`, `krater:native-static`, `krater:wasm`, `krater:wasm-aot` and imports them into the K3s containerd registry.
 
 Verify all images are present in both Docker and K3s:
 ```bash
@@ -162,22 +162,22 @@ These are the pre-defined parameters of the benchmark suite:
 
 ```
 environments:
-  - image: krater-debian:latest
+  - image: krater:native
     runtime_class: default
 
-  - image: krater-static:latest
+  - image: krater:native-static
     runtime_class: default
 
-  - image: krater-wasm:latest
+  - image: krater:wasm
     runtime_class: wasmtime
 
-  - image: krater-wasm:latest
+  - image: krater:wasm
     runtime_class: wasmedge
 
-  - image: krater-wasm:latest
+  - image: krater:wasm
     runtime_class: wasmer
 
-  - image: krater-wasm-aot:latest
+  - image: krater:wasm-aot
     runtime_class: wasmedge
 
 

@@ -6,11 +6,11 @@ build:
   optimization_level: 3
 
 targets:
-  - name: debian
+  - name: native
     code_format: native
     link_mode: dynamic
 
-  - name: static
+  - name: native-static
     code_format: native
     link_mode: static
 

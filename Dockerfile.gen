@@ -19,11 +19,11 @@ WORKDIR /build
 COPY --from=builder_wasi_sdk /build/bench.wasm .
 RUN wasmedge compile --optimize 3 bench.wasm bench_aot.wasm
 
-FROM debian:trixie-slim AS debian
+FROM debian:trixie-slim AS native
 COPY --from=builder_gcc /build/bench /bench
 ENTRYPOINT ["/bench"]
 
-FROM scratch AS static
+FROM scratch AS native-static
 COPY --from=builder_gcc /build/bench_static /bench_static
 ENTRYPOINT ["/bench_static"]
 

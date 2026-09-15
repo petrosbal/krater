@@ -5,7 +5,7 @@ GREEN=$'\033[1;32m'
 RESET=$'\033[0m'
 
 D=$(docker images --format "{{.Repository}}:{{.Tag}}")
-K=$(sudo k3s ctr images list)
+K=$(sudo k3s ctr images list --quiet)
 
 printf "\n- KRATER IMAGE STATUS -\n"
 printf -- "--------------------------------------------\n"
@@ -13,8 +13,8 @@ printf "%-25s %-11s %-10s\n" "IMAGE" "DOCKER" "K3S"
 
 for image in "$@"; do
     d="[    ]"; k="[    ]"; dc="$RESET"; kc="$RESET"
-    echo "$D" | grep -q "$image" && { d="[ ok ]"; dc="$GREEN"; }
-    echo "$K" | grep -q "$image" && { k="[ ok ]"; kc="$GREEN"; }
+    echo "$D" | grep -qxF "$image" && { d="[ ok ]"; dc="$GREEN"; }
+    echo "$K" | grep -qxF "docker.io/library/$image" && { k="[ ok ]"; kc="$GREEN"; }
     printf "%-25s ${dc}%-10s${RESET} ${kc}%-10s${RESET}\n" "$image" "$d" "$k"
 done
 printf "\n"
