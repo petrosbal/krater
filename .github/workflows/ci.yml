@@ -1,4 +1,4 @@
-name: Lint
+name: CI
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  lint:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6.0.3
@@ -28,6 +28,12 @@ jobs:
       - name: Run shellcheck
         run:
           shellcheck scripts/*.sh
+
+      - name: Install SWI-Prolog
+        run: sudo apt-get update && sudo apt-get install -y swi-prolog-nox
+
+      - name: Check the Prolog
+        run: bash scripts/check-prolog.sh
 
       - name: Run hadolint
         uses: hadolint/hadolint-action@v3.1.0
