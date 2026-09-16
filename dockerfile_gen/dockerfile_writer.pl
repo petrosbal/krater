@@ -1,7 +1,7 @@
 %%% dockerfile_writer.pl
 %%%
-%%% Part #4 of the Dockerfile generator pipeline.
-%%% Renders the Dockerfile contents and writes them to a file.
+%%% Renders the Dockerfile and writes it. The only module that knows
+%%% Dockerfile syntax.
 
 :- module(dockerfile_writer, [write_dockerfile/1]).
 :- use_module(library(lists), [member/2]).
@@ -39,16 +39,16 @@ render_builder_stage_input(OutStream, artifact(Toolchain, Filename)):-
 
 % ==============================================================================
 %!  render_builder_stage_step(OutStream, Step).
-%       Renders one line that runs a step of a builder stage. Each kind of step
-%       becomes a different instruction.
+%       Renders one line that runs a step of a builder stage. Every step
+%       becomes a RUN, whatever the toolchain.
 render_builder_stage_step(OutStream, Step):-
     step_command(Step, Command),
     format(OutStream, 'RUN ~w~n', [Command]).
 
 % ==============================================================================
 %!  render_builder_stage(OutStream, Toolchain).
-%       Renders one builder stage: what it runs on, what it installs first, what
-%       it copies in, then one RUN for each step it owns.
+%       Renders one builder stage, from the FROM line through its setup and
+%       inputs to one RUN for each step it owns.
 render_builder_stage(OutStream, Toolchain):-
     nl(OutStream),
     builder_image(Toolchain, Image),
@@ -68,8 +68,8 @@ render_builder_stage(OutStream, Toolchain):-
 
 % ==============================================================================
 %!  render_final_image(OutStream, Target).
-%       Renders one target's final image: what it sits on, the one artifact it
-%       takes from a builder stage, and the command it runs.
+%       Renders one target's final image. It sits on a base, copies the one
+%       artifact from a builder stage, and sets the command that runs it.
 render_final_image(OutStream, Target):-
     nl(OutStream),
     target_base_image(Target, BaseImage),
@@ -87,8 +87,7 @@ render_final_image(OutStream, Target):-
 
 % ==============================================================================
 %!  render_header(OutStream).
-%       Renders the two comment lines that tell a reader not to edit the file by
-%       hand.
+%       Renders the two comments that say not to edit the file by hand.
 render_header(OutStream):-
     format(OutStream,
    "# Automatically generated from build.yaml with the power of Prolog.~n", []),
@@ -96,8 +95,8 @@ render_header(OutStream):-
 
 % ==============================================================================
 %!  render_dockerfile(OutStream).
-%       Renders the whole Dockerfile to OutStream: the header, then one block
-%       per builder stage, then one block per target.
+%       Renders the whole Dockerfile to OutStream, starting with the header,
+%       then one block per toolchain, then one block per target.
 render_dockerfile(OutStream):-
     not(duplicate_targets(_, _)),
     not(stage_name_collision(_)),

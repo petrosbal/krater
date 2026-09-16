@@ -1,6 +1,7 @@
 %%% main.pl
 %%%
-%%% The entry point of the Dockerfile generator pipeline.
+%%% Reads the command line options and writes both files, or explains the
+%%% refusal and exits non-zero. The only module that halts.
 
 :- use_module(library(main), [argv_options/3, main/0]).
 :- use_module(library(option), [option/2]).
@@ -13,8 +14,8 @@
 
 % ==============================================================================
 %!  opt_type(Name, Fact, Type).
-%       The type of each command line option. The first is the option name, the
-%       second is the option term returned, and the third is the term type.
+%       The type of each command line option. Fact is the term argv_options/3
+%       returns, which is also what opt_help/2 and opt_meta/2 are keyed on.
 opt_type(arch, architecture, atom).
 
 % ==============================================================================
@@ -29,8 +30,9 @@ opt_meta(architecture, "ARCH").
 
 % ==============================================================================
 %!  or_refuse(Goal, Reason).
-%       Runs Goal, and throws refused(Reason) when it has no solution. The one
-%       place a step with no answer becomes something main/1 can act on.
+%       Runs Goal, and throws refused(Reason) when it has no solution. Failure
+%       carries no reason of its own, so without the throw main/1 could only
+%       report that something went wrong.
 or_refuse(Goal, _):-
     call(Goal), !.
 
@@ -53,8 +55,8 @@ generate(Argv):-
 
 % ==============================================================================
 %!  main(Argv).
-%       Generates the Dockerfile, or explains the refusal and exits non-zero.
-%       The only predicate in the rule base that ends the process.
+%       Generates both files, or explains the refusal and exits non-zero. The
+%       only predicate that calls halt/1.
 main(Argv):-
     catch(generate(Argv), refused(Reason),
           ( explain(Reason), halt(1) )).

@@ -1,9 +1,8 @@
 %%% diagnostics.pl
 %%%
-%%% Outside the Dockerfile generator pipeline.
-%%% An attempt at explaining why a derivation produced nothing. Every predicate
-%%% here runs only after a derivation has already failed, so none of them is on
-%%% the path of a successful run.
+%%% Explains why a derivation produced nothing. Every predicate here runs only
+%%% after a derivation has already failed, never on the path of a successful
+%%% run.
 
 :- module(diagnostics, [explain/1]).
 :- use_module(library(lists), [member/2]).
@@ -77,9 +76,9 @@ problem(Message):-
 
 % ==============================================================================
 %!  report_problems.
-%       Prints every problem found, one per line. Says so plainly when the
-%       derivation failed for a reason no clause here recognises, rather than
-%       printing nothing and implying all is well.
+%       Prints every problem found, one per line. When no clause here
+%       recognises the failure it says so, because printing nothing would
+%       read as success.
 report_problems:-
     setof(Message, problem(Message), Messages),
     format(user_error, 'cannot derive a Dockerfile:~n', []),

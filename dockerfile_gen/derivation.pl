@@ -1,7 +1,7 @@
 %%% derivation.pl
 %%%
-%%% Part #3 of the Dockerfile generator pipeline.
-%%% Derives the KRATER Dockerfile contents.
+%%% Derives the build graph of toolchains, steps, stages, order, filenames
+%%% and commands. Knows no output syntax, so nothing here may render a line.
 
 :- module(derivation, [ stage_steps/2,
                         stage_name/2,
@@ -44,9 +44,9 @@ target_toolchain(Target, Toolchain):-
 
 % ==============================================================================
 %!  toolchain_supports(Toolchain, Attribute, Value).
-%       Every target attribute value a toolchain accepts. An allowlist: a
-%       pairing with no row is not a build this toolchain can produce, so
-%       nothing derives from it. A new AOT compiler or link mode is one row.
+%       Every target attribute value a toolchain accepts. An allowlist, so a
+%       pairing with no row can't be produced by this toolchain. A new AOT
+%       compiler or link mode is one row.
 toolchain_supports(gcc, link_mode, 'dynamic').
 toolchain_supports(gcc, link_mode, static).
 toolchain_supports(wasi_sdk, aot_compiler, wasmedge).
@@ -85,10 +85,10 @@ target_compile_step(Target, compile(Toolchain, CodeFormat, Modifiers)):-
 
 % ==============================================================================
 %!  target_steps(Target, Steps).
-%       Succeeds when Steps is the target's build pipeline, in run order: a
-%       compile step, and for an AOT target a second step after it. The AOT
-%       step carries its input step whole, which is what lets step_input/2
-%       derive the COPY between stages.
+%       Succeeds when Steps is the target's build pipeline in run order. A
+%       compile step, then for an AOT target a second step after it. The AOT
+%       step carries its input step whole, so step_input/2 can derive the
+%       COPY between stages.
 target_steps(Target, [Step]):-
     target_compile_step(Target, Step),
     not(aot_compiler(Target, _)).
@@ -99,9 +99,7 @@ target_steps(Target, [Step, aot(Compiler, Step)]):-
 
 % ==============================================================================
 %!  target_last_step(Target, Step).
-%       Succeeds when Step is the last step of the target's build pipeline,
-%       i.e. the stage holding the file that ends up in the final image.
-%       This is what the final image's COPY --from= points at.
+%       Succeeds when Step is the last step of the target's build pipeline.
 target_last_step(Target, Step):-
     target_steps(Target, Steps),
     last(Steps, Step).
@@ -118,9 +116,8 @@ duplicate_targets(Target, Other):-
 
 % ==============================================================================
 %!  step_toolchain(Step, Toolchain).
-%       Succeeds when Toolchain is the tool that runs the step. Steps that share
-%       a toolchain share one builder stage, so this is the key the stages group
-%       on.
+%       Succeeds when Toolchain is the tool that runs the step. Steps that
+%       share a toolchain share one builder stage.
 step_toolchain(compile(Toolchain, _, _), Toolchain).
 step_toolchain(aot(Toolchain, _), Toolchain).
 
@@ -195,8 +192,7 @@ toolchain_archive(wasmedge, '/tmp/wasmedge.tar.gz').
 %       Succeeds once per builder stage with every step it must run before its
 %       own steps, in order. A stage whose base image already carries its
 %       toolchain has an empty list. A stage that needs setup it cannot derive
-%       has no answer at all, which is what keeps a half-built stage out of the
-%       Dockerfile.
+%       has no answer, so a half-built stage never reaches the Dockerfile.
 stage_setup(gcc, []).
 stage_setup(rustc, []).
 stage_setup(rustc_wasm, [run('rustup target add wasm32-wasip1')]).
@@ -269,8 +265,8 @@ step_basename(compile(_, _, Modifiers), Basename):-
 % ==============================================================================
 %!  step_filename(Step, Filename).
 %       Succeeds when Filename is the full name of the file the step writes,
-%       extension included. This is the name the RUN command writes and the next
-%       stage copies.
+%       extension included. The RUN command writes it and the next stage
+%       copies it.
 step_filename(Step, Filename):-
     step_basename(Step, Basename),
     step_code_format(Step, CodeFormat),
@@ -398,7 +394,7 @@ modifier_flag(rustc, static, '-C target-feature=+crt-static').
 % ==============================================================================
 %!  step_command(Step, Command).
 %       Succeeds when Command is the shell command the step runs, as one atom.
-%       This is the text that follows RUN in the Dockerfile.
+%       It follows RUN in the Dockerfile.
 step_command(Step, Command):-
     Step = compile(Toolchain, _, Modifiers),
     toolchain_binary(Toolchain, Binary),

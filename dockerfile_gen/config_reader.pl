@@ -1,7 +1,7 @@
 %%% config_reader.pl
 %%%
-%%% Part #1 of the Dockerfile generator pipeline.
-%%% Reads build.yaml, checks it, and returns its content as Prolog facts.
+%%% Reads build.yaml, validates it, and returns its content as facts.
+%%% Asserts nothing, so a rejected config leaves the fact base untouched.
 
 :- module(config_reader, [read_config/2]).
 :- use_module(library(apply), [maplist/3]).
@@ -94,8 +94,8 @@ key_shape(config, targets, list).
 
 % ==============================================================================
 %!  key_expected_shape(Section, Key, Shape).
-%       Succeeds when Shape is the shape a key's value must have: its
-%       key_shape/3 row, or scalar when it has none.
+%       Succeeds when Shape is the shape a key's value must have from its
+%       key_shape/3 row (or scalar when it has none).
 key_expected_shape(Section, Key, Shape):-
     key_shape(Section, Key, Shape).
 
@@ -180,9 +180,8 @@ valid_targets([T|Ts], N):-
 % ==============================================================================
 %!  valid_target_names(Targets).
 %       Succeeds when no two targets declare the same name. Otherwise reports
-%       and fails. A repeated name asserts target/1 twice and makes every
-%       attribute of that name nondeterministic, so the first entry silently
-%       wins.
+%       and fails. A repeated name asserts target/1 twice and the second
+%       target is lost.
 valid_target_names(Targets):-
     maplist(get_dict(name), Targets, Names),
     is_set(Names),
@@ -194,7 +193,8 @@ valid_target_names(_):-
 
 % ==============================================================================
 %!  valid_config(Config).
-%       Checks a parsed build.yaml for validity. Used by read_config/2.
+%       Succeeds when every section of a parsed build.yaml is valid.
+%       Otherwise reports what is wrong and fails.
 valid_config(Config):-
     valid_section(config, Config),
 
@@ -212,8 +212,7 @@ valid_config(Config):-
 %!  target_key_fact(TargetName, TargetDict, Key, Fact).
 %       Succeeds when Fact is what one key of a target declares. The YAML key
 %       is also the functor, so there can be no drift. Fails when the key is
-%       absent, which is what lets single_target_facts/2 treat optional keys
-%       and required keys the same way.
+%       absent, so optional and required keys need no separate handling.
 target_key_fact(TargetName, TargetDict, Key, Fact):-
     get_dict(Key, TargetDict, String),
     atom_string(Value, String),
@@ -274,8 +273,7 @@ parsed_config(Path, Config):-
 % ==============================================================================
 %!  read_config(Path, Facts).
 %       Reads the file at Path and returns the facts it declares. Fails if the
-%       file does not pass valid_config/1, and then returns nothing. This means
-%       a bad file can't load half-way.
+%       file does not pass valid_config/1, so a bad file can't load half-way.
 read_config(Path, Facts):-
     parsed_config(Path, Config),
     valid_config(Config),

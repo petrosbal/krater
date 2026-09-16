@@ -1,7 +1,7 @@
 %%% environments_writer.pl
 %%%
-%%% Part #5 of the Dockerfile generator pipeline.
-%%% Renders the benchmark environments and writes them to a file.
+%%% Renders benchmark_environments.yaml and writes it. The only module that
+%%% knows that file's syntax.
 
 :- module(environments_writer, [write_environments/1]).
 :- use_module(runtime_compatibility).

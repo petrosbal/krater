@@ -1,17 +1,16 @@
 %%% runtime_compatibility.pl
 %%%
-%%% Outside the Dockerfile generator pipeline.
-%%% Which targets may execute under which runtime classes. A pairing with no
-%%% clause here is one that must not reach the harness. Nothing here generates
-%%% anything.
+%%% Pairs each target with the runtime classes it may execute under, and names
+%%% the image it runs in. A pairing with no clause here can't be written, so
+%%% an invalid environment never reaches the harness.
 
 :- module(runtime_compatibility, [environment/2]).
 :- use_module(build_facts).
 
 % ==============================================================================
 %!  wasm_shim(Runtime).
-%       Succeeds when the runtime class is a runwasi shim, meaning it can
-%       execute a plain wasm module.
+%       The runtime classes that are runwasi shims, which means they can execute
+%       a plain Wasm module.
 wasm_shim(wasmtime).
 wasm_shim(wasmedge).
 wasm_shim(wasmer).
@@ -19,14 +18,16 @@ wasm_shim(wasmer).
 % ==============================================================================
 %!  aot_runtime(Compiler, RuntimeClass).
 %       The runtime class that can execute what an AOT compiler produces.
-%       Usually the same name, but the two are different concepts.
+%       Both are called wasmedge today, though nothing says a compiler has
+%       to target a runtime of the same name.
 aot_runtime(wasmedge, wasmedge).
 
 % ==============================================================================
 %!  runs_under(Target, RuntimeClass).
 %       Succeeds when the target may be benchmarked under the given runtime
-%       class. Fails on a pairing that must not run, like Wasmtime running a
-%       WasmEdge AOT module.
+%       class. Fails on a pairing that must not run, like Wasmtime on a
+%       WasmEdge AOT module, which would JIT the bytecode and still be
+%       recorded as AOT.
 runs_under(Target, default):-
     code_format(Target, native).
 
@@ -42,14 +43,14 @@ runs_under(Target, Runtime):-
 
 % ==============================================================================
 %!  target_image_name(Target, ImageName).
-%       Succeeds when ImageName is the name of the image the target runs in.
+%       Succeeds when ImageName is the image the target runs in.
 target_image_name(Target, ImageName):-
     atomic_list_concat([krater, ':', Target], ImageName).
 
 % ==============================================================================
 %!  environment(ImageName, RuntimeClass).
-%       Succeeds when ImageName is the name of the image the target runs in, and
-%       RuntimeClass is the runtime class it may execute under.
+%       Succeeds when the image may run under the runtime class. One answer
+%       for each environment the harness can measure.
 environment(ImageName, RuntimeClass):-
     target(Target),
     runs_under(Target, RuntimeClass),
