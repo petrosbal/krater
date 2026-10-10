@@ -1,4 +1,4 @@
-#include <workload_runner.h>
+#include "workload_runner.h"
 
 #define VAL_A 1.1
 #define VAL_B 2.2
