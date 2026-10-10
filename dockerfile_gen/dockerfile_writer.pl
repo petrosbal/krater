@@ -108,20 +108,12 @@ render_dockerfile(OutStream):-
            render_final_image(OutStream, Target)).
 
 % ==============================================================================
-%!  dockerfile_text(Text).
-%       Succeeds when Text is the whole Dockerfile as a single string. Nothing
-%       reaches the filesystem here, so a derivation that fails leaves Text
-%       unbound and the file on disk untouched.
-dockerfile_text(Text):-
-    with_output_to(string(Text), render_dockerfile(current_output)).
-
-% ==============================================================================
 %!  write_dockerfile(Path).
 %       Writes the Dockerfile to Path. The whole text is rendered before the
 %       file is opened, so a derivation that fails leaves Path untouched
 %       rather than truncated.
 write_dockerfile(Path):-
-    dockerfile_text(Text),
+    with_output_to(string(Text), render_dockerfile(current_output)),
     setup_call_cleanup(
         open(Path, write, OutStream),
         write(OutStream, Text),

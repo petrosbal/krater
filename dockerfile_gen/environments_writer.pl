@@ -33,17 +33,11 @@ render_environments(OutStream):-
            render_environment(OutStream, ImageName, RuntimeClass)).
 
 % ==============================================================================
-%!  environments_text(Text).
-%       Succeeds when Text is the whole environments file as a single string.
-environments_text(Text):-
-    with_output_to(string(Text), render_environments(current_output)).
-
-% ==============================================================================
 %!  write_environments(Path).
 %       Writes the environments to Path. The whole text is rendered before the
 %       file is opened, so a failure leaves Path untouched.
 write_environments(Path):-
-    environments_text(Text),
+    with_output_to(string(Text), render_environments(current_output)),
     setup_call_cleanup(
         open(Path, write, OutStream),
         write(OutStream, Text),
