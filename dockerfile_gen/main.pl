@@ -51,7 +51,7 @@ generate(Argv):-
     or_refuse(write_dockerfile(
         'dockerfile_gen/generated/Dockerfile'), underivable),
     or_refuse(write_environments(
-        'dockerfile_gen/generated/benchmark_environments.yaml'), underivable).
+        'dockerfile_gen/generated/available_environments.yaml'), underivable).
 
 % ==============================================================================
 %!  main(Argv).

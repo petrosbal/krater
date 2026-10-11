@@ -3,7 +3,7 @@ import yaml
 import sys
 import subprocess
 
-with open('dockerfile_gen/generated/benchmark_environments.yaml', 'r') as f:
+with open('dockerfile_gen/generated/available_environments.yaml', 'r') as f:
     parsed = yaml.safe_load(f)
 entries = dict()
 for env in parsed["environments"]:

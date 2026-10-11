@@ -1,6 +1,6 @@
 %%% environments_writer.pl
 %%%
-%%% Renders benchmark_environments.yaml and writes it. The only module that
+%%% Renders available_environments.yaml and writes it. The only module that
 %%% knows that file's syntax.
 
 :- module(environments_writer, [write_environments/1]).
