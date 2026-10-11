@@ -30,6 +30,7 @@ import json
 import os
 import threading
 import argparse
+import itertools
 import sys
 import yaml
 from pathlib import Path
@@ -212,7 +213,7 @@ class PodOrchestrator:
             raise
 
     # constructs the pod manifest dict, configuring name, image, args and resources
-    def create_pod_yaml(self, pod_name: str, size: int, duration: float, warmup: bool) -> dict:
+    def create_pod_yaml(self, pod_name: str, env: dict) -> dict:
         cpu_val = self.args.cpu
         mem_val = self.args.memory
         pod_spec = {
@@ -221,7 +222,7 @@ class PodOrchestrator:
                 "name": "bench",
                 "image": self.args.image,
                 "imagePullPolicy": "Never",
-                "args": ["w" if warmup else "nw", str(size), str(duration)],
+                "env": [{"name": name, "value": str(value)} for name, value in env.items()],
                 "resources": {
                     "requests": {"cpu": cpu_val, "memory": mem_val},
                     "limits":   {"cpu": cpu_val, "memory": mem_val}
@@ -345,10 +346,10 @@ class PodOrchestrator:
         )
         assert proc.stdout is not None # set because stdout=PIPE
 
-        # if BENCH_END never appears (bench.c crash, runtime hang, API server gone),
+        # if BENCH_END never appears (workload crash, runtime hang, API server gone),
         # readline blocks forever. kill kubectl after a generous deadline so the
         # trial fails cleanly instead of freezing the whole run.
-        timeout = self.args.duration + LOG_STREAM_OVERHEAD
+        timeout = self.args.warmup + self.args.duration + LOG_STREAM_OVERHEAD
         watchdog = threading.Timer(timeout, proc.terminate)
         watchdog.start()
 
@@ -382,7 +383,7 @@ class PodOrchestrator:
         return "".join(stdout_lines)
 
     # handles parsing, metrics calculation and saving
-    def _process_and_save_results(self, trial_idx: int, matrix_size: int, suffix: str, phase_ts: dict, raw_output: str, samples: list) -> None:
+    def _process_and_save_results(self, trial_idx: int, key: str, phase_ts: dict, raw_output: str, samples: list) -> None:
         parsed = self.parse_output(raw_output)
         trial_entry = {
             "trial": trial_idx,
@@ -397,7 +398,6 @@ class PodOrchestrator:
         else:
             print(f"   [metrics] additional metrics skipped: {reason}")
         
-        key = f"{matrix_size}_{suffix}"
         if key not in self.results:
             self.results[key] = []
 
@@ -417,17 +417,28 @@ class PodOrchestrator:
                 break
             time.sleep(1)
 
+    def build_pod_env(self, combination: dict) -> dict:
+        pod_env = dict(combination)
+        pod_env["KRATER_DURATION"] = self.args.duration
+        pod_env["KRATER_WARMUP"] = self.args.warmup
+
+        return pod_env
+
 
     # the big guns. orchestrates a single experiment
-    def run_trial(self, trial_idx: int, matrix_size: int, warmup: bool) -> None:
-        suffix = 'w' if warmup else 'nw'
-        pod_name = f"bench-{self.args.runtime_class}-{matrix_size}-{trial_idx}-{suffix}"
-        print(f"\n--- trial {trial_idx}: {pod_name} (size={matrix_size}) ---")
+    def run_trial(self, trial_idx: int, combination: dict) -> None:
+        pod_name = f"bench-{self.args.runtime_class}-{trial_idx}"
 
         env = os.environ.copy()
         if "KUBECONFIG" not in env:
             env["KUBECONFIG"] = DEFAULT_KUBECONFIG
-        manifest = self.create_pod_yaml(pod_name, matrix_size, self.args.duration, warmup)
+
+        pod_env = self.build_pod_env(combination)
+
+        key = combination_key(pod_env)
+        print(f"\n--- trial {trial_idx}: {pod_name} ({key}) ---")
+
+        manifest = self.create_pod_yaml(pod_name, pod_env)
         phase_ts = {}
 
         try:
@@ -439,7 +450,7 @@ class PodOrchestrator:
             samples = []
             raw_output = self._execute_benchmark(pod_name, env, cgroup, stop_event, samples, phase_ts)
 
-            self._process_and_save_results(trial_idx, matrix_size, suffix, phase_ts, raw_output, samples)
+            self._process_and_save_results(trial_idx, key, phase_ts, raw_output, samples)
             print("   trial saved.")
 
 
@@ -458,11 +469,10 @@ class PodOrchestrator:
         print("\n" + "="*50)
         print(f"  SUMMARY CHECKER: {self.results_file}")
         print("="*50)
-        suffix = 'w' if self.args.warmup else 'nw'
-        for size in self.args.sizes:
-            key = f"{size}_{suffix}"
+        for combination in param_combinations(self.args.params):
+            key = combination_key(self.build_pod_env(combination))
             count = len(self.results.get(key, []))
-            print(f"{key:<15} | Completed: {count}/{self.args.trials}")
+            print(f"Completed: {count}/{self.args.trials} | {key}")
 
 
 # a trial is done if the workload reported itself valid and the cgroup metrics were computed
@@ -471,6 +481,16 @@ def trial_is_done(entry: dict) -> bool:
     if result is None:
         return False
     return result.get("valid") is True and "additional_metrics" in entry
+
+def param_combinations(params: dict):
+    names = list(params.keys())
+    valuelists = list(params.values())
+    product = itertools.product(*valuelists)
+
+    return [dict(zip(names, row)) for row in product]
+
+def combination_key(combination: dict) -> str:
+    return ",".join(f"{name}={combination[name]}" for name in sorted(combination))
 
 # -------------------
 # Main
@@ -481,11 +501,11 @@ if __name__ == "__main__":
     parser.add_argument("--runtime_class", required=True)
     parser.add_argument("--namespace", default="default")
     parser.add_argument("--output", default="bench_results.json")
-    parser.add_argument("--sizes", nargs='+', type=int, default=[512, 1024])
+    parser.add_argument("--params", type=json.loads, required=True)
     parser.add_argument("--trials", type=int, default=5)
+    parser.add_argument("--warmup", type=float, default=0.0)
     parser.add_argument("--duration", type=float, default=10.0)
     parser.add_argument("--interval", type=float, default=1.0)
-    parser.add_argument("--warmup", action='store_true')
     parser.add_argument("--cpu", default="1000m")
     parser.add_argument("--memory", default="1024Mi")
     args = parser.parse_args()
@@ -497,11 +517,10 @@ if __name__ == "__main__":
 
     # init orchestrators
     orch = PodOrchestrator(args)
-    suffix = 'w' if args.warmup else 'nw'
 
-    # iterates sizes, checks checkpoints, runs trails
-    for size in args.sizes:
-        key = f"{size}_{suffix}"
+    # iterates param combinations, checks checkpoints, runs trails
+    for combination in param_combinations(args.params):
+        key = combination_key(orch.build_pod_env(combination))
         stored_data = orch.results.get(key, [])
         completed_trials = {e["trial"] for e in stored_data if trial_is_done(e)}
 
@@ -510,7 +529,7 @@ if __name__ == "__main__":
                 print(f"--- trial {i} for {key} already done (valid), skipping. ---")
                 continue
             
-            orch.run_trial(i, size, args.warmup)
+            orch.run_trial(i, combination)
 
     orch.print_summary()
     print("\nbenchmark suite done.")

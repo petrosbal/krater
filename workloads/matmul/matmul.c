@@ -7,7 +7,7 @@ static long N;
 static double *restrict A, *restrict B, *restrict C;
 
 static void bench_setup(void) {
-    N = krater_param_int("KRATER_SIZE", 256);
+    N = krater_param_int("size", 256);
     if (N<1) {
         fprintf(stderr, "error: N must be greater than zero\n");
         exit(1);

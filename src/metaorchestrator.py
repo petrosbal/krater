@@ -23,16 +23,17 @@ It is responsible for:
 """
 
 import yaml
+import json
 import subprocess
 import sys
 import re
 from pathlib import Path
+from single_env_orch import param_combinations
 
 YAML_FILE = "src/bench_config.yaml"
 SCRIPT_NAME = "src/single_env_orch.py"
 PYTHON_EXEC = sys.executable # i use the orchestrator's interpreter for the single env script
 
-WARMUP_DURATION       = 5   # seconds. matches warmup loop in bench.c
 POD_OVERHEAD_ESTIMATE = 15  # seconds per trial (delete, apply, uid/running wait, cleanup)
 
 # k (lowercase) is the canonical K8s prefix (not a typo)
@@ -44,7 +45,7 @@ SUFFIX_MAP = [
 # for the shared_args section of the config
 REQUIRED_SHARED_KEYS = frozenset({
     "results_subfolder_name",
-    "sizes",
+    "params",
     "trials",
     "duration",
     "warmup",
@@ -56,6 +57,7 @@ REQUIRED_SHARED_KEYS = frozenset({
 
 # for each environment entry in the config
 REQUIRED_ENV_KEYS = frozenset({"image", "runtime_class"})
+RESERVED_PARAM_NAMES = frozenset({"KRATER_DURATION", "KRATER_WARMUP"})
 
 def load_config(path: str) -> dict:
     with open(path, 'r') as f:
@@ -109,8 +111,9 @@ def validate_config(config) -> bool:
         print(f"YAML error: 'trials' must be an integer >= 1, got {shared['trials']!r}")
         return False
 
-    if not isinstance(shared["warmup"], bool):
-        print(f"YAML error: 'warmup' must be a boolean, got {shared['warmup']!r}")
+    warmup = shared['warmup']
+    if not isinstance(warmup, (int, float)) or isinstance(warmup, bool) or warmup < 0:
+        print(f"YAML error: 'warmup' must be a non-negative number, got {warmup!r}")
         return False
 
     interval = shared["interval"]
@@ -140,19 +143,32 @@ def validate_config(config) -> bool:
         print(f"YAML error: 'memory' must be a positive value, got {shared['memory']!r}")
         return False
 
-    sizes = shared["sizes"]
-    if not isinstance(sizes, list) or not sizes:
-        print("YAML error: 'sizes' must be a non-empty list")
+    if not validate_params(shared['params']):
         return False
-    for n in sizes:
-        if not isinstance(n, int) or isinstance(n, bool) or n < 2:
-            print(f"YAML error: 'sizes' entries must be integers >= 2, got {n!r}")
-            return False
-        required = 3 * n * n * 8
-        if required > memory_bytes:
-            print(f"YAML error: N={n} needs {required // 1024**2}Mi for matrix allocation alone, memory limit is {memory_bytes // 1024**2}Mi")
-            return False
 
+    return True
+
+def validate_params(params) -> bool:
+    if not isinstance(params, dict):
+        print(f"YAML error: 'params' must be a dict, got {params!r}")
+        return False
+    for name, valuelist in params.items():
+        if not isinstance(name, str) or not re.match(r'^[a-zA-Z][a-zA-Z0-9_]*$', name):
+            print(f"YAML error: invalid parameter name ({name})")
+            return False
+        if name in RESERVED_PARAM_NAMES:
+            print(f"YAML error: parameter name ({name}) is reserved")
+            return False
+        if not isinstance(valuelist, list):
+            print(f"YAML error: values for {name} must be in a list")
+            return False
+        if not valuelist:
+            print(f"YAML error: no values for {name}")
+            return False
+        for value in valuelist:
+            if not isinstance(value, (int, float, str)) or isinstance(value, bool):
+                print(f"YAML error: values for {name} must be numbers or strings")
+                return False
     return True
 
 def parse_memory_bytes(s: str) -> int:
@@ -167,9 +183,9 @@ def parse_memory_bytes(s: str) -> int:
 
 def estimate_duration(config: dict) -> int:
     shared = config['shared_args']
-    warmup = WARMUP_DURATION if shared['warmup'] else 0
+    warmup = shared['warmup']
     per_trial = shared['duration'] + warmup + POD_OVERHEAD_ESTIMATE
-    return int(len(config['environments']) * len(shared['sizes']) * shared['trials'] * per_trial)
+    return int(len(config['environments']) * len(param_combinations(shared['params'])) * shared['trials'] * per_trial)
 
 def format_duration(seconds: int) -> str:
     h, rem = divmod(seconds, 3600)
@@ -203,15 +219,9 @@ def construct_command(script_path: str, shared_args: dict, env_args: dict) -> li
     for key, value in final_args.items():
         arg_flag = f"--{key}"
 
-        if isinstance(value, bool):
-            # boolean (flags): either include the flag or not (for the warmup one)
-            if value:
-                cmd.append(arg_flag)
-
-        elif isinstance(value, list):
-            # list (nargs='+'): --sizes 512 1024
+        if isinstance(value, dict):
             cmd.append(arg_flag)
-            cmd.extend([str(v) for v in value])
+            cmd.append(json.dumps(value))
 
         else:
             # standard key-value
