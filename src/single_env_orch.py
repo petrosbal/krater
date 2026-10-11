@@ -42,13 +42,12 @@ class CgroupHandler:
     """
     
     def __init__(self, pod_name: str, namespace: str, env: dict) -> None:
-        self.path = None
-        self._find_path(pod_name, namespace, env)
+        self.path = self._find_path(pod_name, namespace, env)
 
     # determines the exact cgroup path for a running container.
     # approach: ask containerd for the host PID via its task table (runtime agnostic!)
     # then read /proc/<pid>/cgroup directly.
-    def _find_path(self, pod_name: str, namespace: str, env: dict) -> None:
+    def _find_path(self, pod_name: str, namespace: str, env: dict) -> str:
         # first get the container ID from the pod status
         container_id_raw = kubectl_output(["get", "pod", pod_name, "-n", namespace,
                                            "-o", "jsonpath={.status.containerStatuses[0].containerID}"], env)
@@ -80,19 +79,21 @@ class CgroupHandler:
         # finally, read the actual cgroup path from the kernel.
         # /proc/<pid>/cgroup cannot lie about where the process is
         # cgroup v2 format: "0::/path"
+        path = None
         try:
             with open(f"/proc/{pid}/cgroup") as f:
                 for line in f:
                     if line.startswith("0::"):
-                        self.path = "/sys/fs/cgroup" + line.strip().removeprefix("0::")
+                        path = "/sys/fs/cgroup" + line.strip().removeprefix("0::")
                         break
         except FileNotFoundError:
             raise RuntimeError(f"Process {pid} not found in /proc. container may have already exited")
 
-        if self.path is None:
+        if path is None:
             raise RuntimeError(f"No cgroup v2 entry found in /proc/{pid}/cgroup")
 
-        print(f"   [cgroup] pid={pid}, path={self.path}")
+        print(f"   [cgroup] pid={pid}, path={path}")
+        return path
 
     # captures a timestamped snapshot of cgroup v2 metrics by parsing them directly from the relevant files
     def read_stats(self) -> dict | None:
@@ -349,6 +350,7 @@ class PodOrchestrator:
             ["kubectl", "logs", "-f", pod_name, "-n", self.args.namespace],
             stdout=subprocess.PIPE, text=True, env=env
         )
+        assert proc.stdout is not None # set because stdout=PIPE
 
         # if BENCH_END never appears (bench.c crash, runtime hang, API server gone),
         # readline blocks forever. kill kubectl after a generous deadline so the
