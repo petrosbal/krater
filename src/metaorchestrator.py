@@ -31,6 +31,7 @@ from pathlib import Path
 from single_env_orch import param_combinations
 
 YAML_FILE = "src/bench_config.yaml"
+ENVIRONMENTS_FILE = "dockerfile_gen/generated/available_environments.yaml"
 SCRIPT_NAME = "src/single_env_orch.py"
 PYTHON_EXEC = sys.executable # i use the orchestrator's interpreter for the single env script
 
@@ -53,15 +54,22 @@ REQUIRED_SHARED_KEYS = frozenset({
     "namespace",
     "cpu",
     "memory",
+    "runtimes"
 })
 
-# for each environment entry in the config
-REQUIRED_ENV_KEYS = frozenset({"image", "runtime_class"})
 RESERVED_PARAM_NAMES = frozenset({"KRATER_DURATION", "KRATER_WARMUP"})
 
 def load_config(path: str) -> dict:
     with open(path, 'r') as f:
         return yaml.safe_load(f)
+
+# only runtime classes listed in the config can run
+def select_environments(environments: list, runtimes: list) -> list | None:
+    unknown = set(runtimes) - {env["runtime_class"] for env in environments}
+    if unknown:
+        print(f"YAML error: unknown runtimes ({sorted(unknown)})")
+        return None
+    return [env for env in environments if env["runtime_class"] in runtimes]
 
 def validate_config(config) -> bool:
     # top-level structure
@@ -69,23 +77,11 @@ def validate_config(config) -> bool:
         print("YAML error: config is empty or not a valid mapping")
         return False
 
-    # environments: must be a non-empty list of valid entries
-    envs = config.get("environments")
-    if not isinstance(envs, list) or not envs:
-        print("YAML error: 'environments' must be a non-empty list")
+    # environments come from dockerfile_gen/generated/, so only shared_args belongs here
+    unknown = set(config) - {"shared_args"}
+    if unknown:
+        print(f"YAML error: unknown top-level keys: {sorted(unknown)}")
         return False
-
-    for i, env in enumerate(envs):
-        if not isinstance(env, dict):
-            print(f"YAML error: environments[{i}] must be a mapping")
-            return False
-        env_keys = set(env)
-        if missing := REQUIRED_ENV_KEYS - env_keys:
-            print(f"YAML error: environments[{i}] missing required keys: {', '.join(sorted(missing))}")
-            return False
-        if unknown := env_keys - REQUIRED_ENV_KEYS:
-            print(f"YAML error: environments[{i}] has unknown keys: {', '.join(sorted(unknown))}")
-            return False
 
     # shared_args: must be a mapping with exactly the required keys
     shared = config.get("shared_args")
@@ -146,6 +142,15 @@ def validate_config(config) -> bool:
     if not validate_params(shared['params']):
         return False
 
+    runtimes = shared["runtimes"]
+    if not isinstance(runtimes, list) or not runtimes:
+        print(f"YAML error: 'runtimes' must be a non-empty list, got {runtimes!r}")
+        return False
+    for name in runtimes:
+        if not isinstance(name, str):
+            print(f"YAML error: 'runtimes' entries must be strings, got {name!r}")
+            return False
+
     return True
 
 def validate_params(params) -> bool:
@@ -181,11 +186,11 @@ def parse_memory_bytes(s: str) -> int:
     except ValueError:
         raise ValueError(f"Unparseable memory value: {s!r}. Expected format: 512Mi, 2Gi, 1024, etc.")
 
-def estimate_duration(config: dict) -> int:
+def estimate_duration(config: dict, environments: list) -> int:
     shared = config['shared_args']
     warmup = shared['warmup']
     per_trial = shared['duration'] + warmup + POD_OVERHEAD_ESTIMATE
-    return int(len(config['environments']) * len(param_combinations(shared['params'])) * shared['trials'] * per_trial)
+    return int(len(environments) * len(param_combinations(shared['params'])) * shared['trials'] * per_trial)
 
 def format_duration(seconds: int) -> str:
     h, rem = divmod(seconds, 3600)
@@ -197,8 +202,10 @@ def format_duration(seconds: int) -> str:
 def construct_command(script_path: str, shared_args: dict, env_args: dict) -> list:
     final_args = {**shared_args, **env_args}
 
-    # remove non-script, orchestrator-only arg
+    # remove metaorchestrator-only args
     subfolder = final_args.pop('results_subfolder_name')
+    final_args.pop('runtimes')
+    final_args.pop('target')
 
     # handle output dir & filename
     # for instance, results/<subfolder>/krater_native-static_default.json
@@ -243,18 +250,24 @@ def run() -> None:
     if not validate_config(config):
         return
 
-    estimated = estimate_duration(config)
+    environments = select_environments(
+                    load_config(ENVIRONMENTS_FILE)["environments"], 
+                    config["shared_args"]["runtimes"])
+    if environments is None:
+        return
+
+    estimated = estimate_duration(config, environments)
     print(f"Estimated duration: ~{format_duration(estimated)}")
     print("(approximate - does not account for completed checkpoints)")
     if input("Continue? [y/n] ").strip().lower() not in ('y', 'yes'):
         print("Aborted.")
         return
 
-    print(f"Orchestrator started. Found {len(config['environments'])} environments.")
+    print(f"Orchestrator started. Found {len(environments)} environments.")
 
-    for i, env in enumerate(config['environments'], 1):
+    for i, env in enumerate(environments, 1):
         print(f"\n{'='*60}")
-        print(f"[run {i}/{len(config['environments'])}] image: {env['image']} | runtime: {env['runtime_class']}")
+        print(f"[run {i}/{len(environments)}] image: {env['image']} | runtime: {env['runtime_class']}")
 
         try:
             cmd = construct_command(SCRIPT_NAME, config['shared_args'], env)
