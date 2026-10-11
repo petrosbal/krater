@@ -1,6 +1,6 @@
 workload:
   language: c
-  source: src/bench.c
+  source: workloads/matmul/matmul.c
 
 build:
   optimization_level: 3
