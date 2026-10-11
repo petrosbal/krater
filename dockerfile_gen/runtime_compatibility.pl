@@ -6,6 +6,7 @@
 
 :- module(runtime_compatibility, [environment/2]).
 :- use_module(build_facts).
+:- use_module(derivation).
 
 % ==============================================================================
 %!  wasm_shim(Runtime).
@@ -45,7 +46,8 @@ runs_under(Target, Runtime):-
 %!  target_image_name(Target, ImageName).
 %       Succeeds when ImageName is the image the target runs in.
 target_image_name(Target, ImageName):-
-    atomic_list_concat([krater, ':', Target], ImageName).
+    workload_basename(WorkloadName),
+    atomic_list_concat([krater, ':', WorkloadName, '_', Target], ImageName).
 
 % ==============================================================================
 %!  environment(ImageName, RuntimeClass).

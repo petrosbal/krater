@@ -2,20 +2,20 @@
 # You probably don't want to edit this file.
 
 environments:
-  - image: krater:native
+  - image: krater:matmul_native
     runtime_class: default
 
-  - image: krater:native-static
+  - image: krater:matmul_native-static
     runtime_class: default
 
-  - image: krater:wasm
+  - image: krater:matmul_wasm
     runtime_class: wasmtime
 
-  - image: krater:wasm
+  - image: krater:matmul_wasm
     runtime_class: wasmedge
 
-  - image: krater:wasm
+  - image: krater:matmul_wasm
     runtime_class: wasmer
 
-  - image: krater:wasm-aot
+  - image: krater:matmul_wasm-aot
     runtime_class: wasmedge

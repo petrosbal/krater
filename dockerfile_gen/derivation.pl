@@ -1,7 +1,7 @@
 %%% derivation.pl
 %%%
 %%% Derives the build graph of toolchains, steps, stages, order, filenames
-%%% and commands. Knows no output syntax, so nothing here may render a line.
+%%% and commands. Knows no output syntax, so nothing here can render a line.
 
 :- module(derivation, [ stage_steps/2,
                         stage_name/2,
@@ -21,7 +21,8 @@
                         optimization_syntax/2,
                         toolchain_asset/3,
                         duplicate_targets/2,
-                        stage_name_collision/1 ]).
+                        stage_name_collision/1,
+                        workload_basename/1 ]).
 :- use_module(library(lists), [append/2, member/2, last/2]).
 :- use_module(library(ugraphs), [top_sort/2, vertices_edges_to_ugraph/3]).
 :- use_module(build_facts).
