@@ -201,12 +201,12 @@ def construct_command(script_path: str, shared_args: dict, env_args: dict) -> li
     subfolder = final_args.pop('results_subfolder_name')
 
     # handle output dir & filename
-    # for instance, results/test_bench/bench-debian_default.json
+    # for instance, results/<subfolder>/krater_native-static_default.json
     output_dir = Path("results") / subfolder
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # clean the image name a bit (bench-debian:latest -> bench-debian)
-    safe_image_name = final_args['image'].split(':')[0]
+    # clean the image name a bit
+    safe_image_name = final_args['image'].replace(':', '_').replace('/', '_')
     safe_runtime = final_args['runtime_class']
     output_filename = output_dir / f"{safe_image_name}_{safe_runtime}.json"
 
