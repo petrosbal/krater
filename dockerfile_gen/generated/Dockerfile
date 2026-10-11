@@ -4,12 +4,14 @@
 FROM gcc:14-trixie AS builder_gcc
 WORKDIR /build
 COPY src/bench.c bench.c
+COPY src/workload_runner.h workload_runner.h
 RUN gcc -O3 -s -o bench bench.c
 RUN gcc -O3 -s -static -o bench_static bench.c
 
 FROM ghcr.io/webassembly/wasi-sdk:wasi-sdk-32 AS builder_wasi_sdk
 WORKDIR /build
 COPY src/bench.c bench.c
+COPY src/workload_runner.h workload_runner.h
 RUN $CC -O3 -Wl,--strip-all -o bench.wasm bench.c
 
 FROM debian:trixie-slim AS builder_wasmedge

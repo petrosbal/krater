@@ -274,10 +274,20 @@ step_filename(Step, Filename):-
     atomic_list_concat([Basename|Extensions], Filename).
 
 % ==============================================================================
+%!  language_runner(Language, Path).
+%       The header Path that defines main for a workload written in Language.
+language_runner(c, 'src/workload_runner.h').
+
+% ==============================================================================
 %!  step_input(Step, Input).
 %       Succeeds when Input is a file the step needs before it can run. A
-%       compile step reads the workload source. An AOT step reads the file its
-%       input step wrote, which another stage holds.
+%       compile step reads the workload source and its language's runner. An AOT
+%       step reads the file its input step wrote, which another stage holds.
+step_input(compile(_,_,_), source(Path, Filename)):-
+    workload_language(Language),
+    language_runner(Language, Path),
+    file_base_name(Path, Filename).
+
 step_input(compile(_,_,_), source(Path, Filename)):-
     workload_source(Path),
     file_base_name(Path, Filename).
