@@ -1,5 +1,5 @@
 export DOCKER_BUILDKIT=1
-IMAGES = krater:native krater:native-static krater:wasm krater:wasm-aot
+IMAGES = $(shell python3 scripts/images.py list)
 
 RUNWASI_VERSION := 0.6.0
 ARCH            := $(shell uname -m)
@@ -16,10 +16,7 @@ RESET   := \033[0m
 all: help
 
 build-images: ## Build all targets and import to k3s *
-	docker build -f dockerfile_gen/generated/Dockerfile --target native -t krater:native .
-	docker build -f dockerfile_gen/generated/Dockerfile --target native-static -t krater:native-static .
-	docker build -f dockerfile_gen/generated/Dockerfile --target wasm -t krater:wasm .
-	docker build -f dockerfile_gen/generated/Dockerfile --target wasm-aot -t krater:wasm-aot .
+	python3 scripts/images.py build
 	@echo "Importing to k3s..."
 	@bash -o pipefail -c 'docker save $(IMAGES) | sudo k3s ctr images import - > /dev/null'
 
