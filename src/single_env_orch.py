@@ -30,7 +30,6 @@ import json
 import os
 import threading
 import argparse
-import re
 import sys
 import yaml
 from pathlib import Path
@@ -235,23 +234,17 @@ class PodOrchestrator:
                 "metadata": {"name": pod_name, "namespace": self.args.namespace},
                 "spec": pod_spec}
 
-    # scrapes the container logs with regex to get metrics from the benchmark itself
+    # the runner prints exactly one BENCH_RESULT line, the harness reads its json here
     def parse_output(self, stdout: str) -> dict:
-        metrics = {"raw_output": stdout}
-        mapping = {"iterations": int, "throughput_mflops": float, "valid": lambda x: x.upper()=="PASSED"}
-        patterns = {
-            "iterations": r"iterations:\s*(\d+)",
-            "throughput_mflops": r"throughput:\s*([\d.]+)",
-            "valid": r"calculation check:\s*(\w+)"
-        }
-        for key, pat in patterns.items():
-            m = re.search(pat, stdout, re.IGNORECASE)
-            if m:
+        result = None
+        for line in stdout.splitlines():
+            if line.startswith("BENCH_RESULT "):
                 try:
-                    metrics[key] = mapping[key](m.group(1))
-                except Exception:
-                    metrics[key] = None
-        return metrics
+                    result = json.loads(line.removeprefix("BENCH_RESULT "))
+                except json.JSONDecodeError as e:
+                    print(f"   [parse] BENCH_RESULT is not valid JSON: {e}")
+                break
+        return {"raw_output": stdout, "result": result}
 
     # manages the pod's lifecycle
     # maybe it does too much. clears stale instances, deploys new pod, polls the api
@@ -471,6 +464,14 @@ class PodOrchestrator:
             count = len(self.results.get(key, []))
             print(f"{key:<15} | Completed: {count}/{self.args.trials}")
 
+
+# a trial is done if the workload reported itself valid and the cgroup metrics were computed
+def trial_is_done(entry: dict) -> bool:
+    result = entry.get("parsed_metrics", {}).get("result")
+    if result is None:
+        return False
+    return result.get("valid") is True and "additional_metrics" in entry
+
 # -------------------
 # Main
 # -------------------
@@ -502,12 +503,7 @@ if __name__ == "__main__":
     for size in args.sizes:
         key = f"{size}_{suffix}"
         stored_data = orch.results.get(key, [])
-        
-        # smart resume. checks if trial is already valid in json
-        completed_trials = {
-            e['trial'] for e in stored_data 
-            if e.get("parsed_metrics", {}).get("valid") and e.get("additional_metrics")
-        }
+        completed_trials = {e["trial"] for e in stored_data if trial_is_done(e)}
 
         for i in range(args.trials):
             if i in completed_trials:
