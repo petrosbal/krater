@@ -21,13 +21,17 @@ A benchmarking framework for comparing WebAssembly and Linux container runtime e
 
 * Source code (`src/`):
 
-    * **bench.c**: Benchmark source. Performs matrix multiplication with integrated validity check. Outputs iterations and throughput in MFLOPS.
+    * **workload_runner.h**: Runner for C workloads. Defines `main()`, the timed loop and the single `BENCH_RESULT` JSON line. A workload includes it as a header.
 
     * **single_env_orch.py**: A Python orchestrator that handles pod deployment, log parsing, and cgroup resource monitoring for a single execution environment.
 
     * **metaorchestrator.py**: The main benchmarking script. Coordinates a benchmark suite across multiple execution environments. It is configured exclusively by `bench_config.yaml`.
 
     * **bench_config.yaml**: Single source of truth for benchmark configuration - environments, matrix sizes, trial count, duration, warmup, cgroup sample interval, and output subfolder.
+
+* Workloads (`workloads/`):
+
+    * **matmul/matmul.c**: Standard matrix multiplication with validity check. Reports throughput in MFLOPS.
 
 * **dockerfile_gen/generated/Dockerfile**: Multi-stage build file, generated from `build.yaml`, defining four targets:
     * `native`: GCC, dynamically linked (Debian Slim)
@@ -208,7 +212,7 @@ config:
 ---
 flowchart TB
  subgraph DataSources["Data Sources"]
-        PodLogs["bench.c output 
+        PodLogs["workload output 
         (via kubectl logs)"]
         Cgroups["cgroup filesystem 
         (/sys/fs/cgroup)"]
@@ -254,7 +258,7 @@ gantt
     Running                      :pod2, after pod1, 7s
     Terminating                  :pod3, after pod2, 1s
     
-    section App (bench.c)
+    section App (workload)
     init                         :ben1, after pod1, 1s
     warmup (5s)                  :ben2, after ben1, 1s
     workload loop                :crit, ben3, after ben2, 4s
