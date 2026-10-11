@@ -4,7 +4,7 @@
 %%% the image it runs in. A pairing with no clause here can't be written, so
 %%% an invalid environment never reaches the harness.
 
-:- module(runtime_compatibility, [environment/2]).
+:- module(runtime_compatibility, [environment/3]).
 :- use_module(build_facts).
 :- use_module(derivation).
 
@@ -50,10 +50,10 @@ target_image_name(Target, ImageName):-
     atomic_list_concat([krater, ':', WorkloadName, '_', Target], ImageName).
 
 % ==============================================================================
-%!  environment(ImageName, RuntimeClass).
+%!  environment(Target, ImageName, RuntimeClass).
 %       Succeeds when the image may run under the runtime class. One answer
 %       for each environment the harness can measure.
-environment(ImageName, RuntimeClass):-
+environment(Target, ImageName, RuntimeClass):-
     target(Target),
     runs_under(Target, RuntimeClass),
     target_image_name(Target, ImageName).

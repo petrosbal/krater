@@ -15,11 +15,13 @@ render_header(OutStream):-
     format(OutStream, "# You probably don't want to edit this file.~n", []).
 
 % ==============================================================================
-%!  render_environment(OutStream, ImageName, RuntimeClass).
-%       Renders a blank line, then the environment's image and runtime class.
-render_environment(OutStream, ImageName, RuntimeClass):-
+%!  render_environment(OutStream, Target, ImageName, RuntimeClass).
+%       Renders a blank line, then the environment's target, image and runtime
+%       class.
+render_environment(OutStream, Target, ImageName, RuntimeClass):-
     nl(OutStream),
-    format(OutStream, '  - image: ~w~n', [ImageName]),
+    format(OutStream, '  - target: ~w~n', [Target]),
+    format(OutStream, '    image: ~w~n', [ImageName]),
     format(OutStream, '    runtime_class: ~w~n', [RuntimeClass]).
 
 % ==============================================================================
@@ -29,8 +31,8 @@ render_environments(OutStream):-
     render_header(OutStream),
     nl(OutStream),
     write(OutStream, 'environments:'),
-    forall(environment(ImageName, RuntimeClass),
-           render_environment(OutStream, ImageName, RuntimeClass)).
+    forall(environment(Target, ImageName, RuntimeClass),
+           render_environment(OutStream, Target, ImageName, RuntimeClass)).
 
 % ==============================================================================
 %!  write_environments(Path).
