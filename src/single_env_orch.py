@@ -475,12 +475,10 @@ class PodOrchestrator:
             print(f"Completed: {count}/{self.args.trials} | {key}")
 
 
-# a trial is done if the workload reported itself valid and the cgroup metrics were computed
+# a trial is done if result exists and the cgroup metrics were computed
 def trial_is_done(entry: dict) -> bool:
     result = entry.get("parsed_metrics", {}).get("result")
-    if result is None:
-        return False
-    return result.get("valid") is True and "additional_metrics" in entry
+    return result is not None and "additional_metrics" in entry
 
 def param_combinations(params: dict):
     names = list(params.keys())
@@ -526,7 +524,7 @@ if __name__ == "__main__":
 
         for i in range(args.trials):
             if i in completed_trials:
-                print(f"--- trial {i} for {key} already done (valid), skipping. ---")
+                print(f"--- trial {i} for {key} already done, skipping. ---")
                 continue
             
             orch.run_trial(i, combination)
