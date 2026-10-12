@@ -10,4 +10,4 @@ run:
   namespace: default
   cpu: "1000m"
   memory: "1024Mi"
-  results_subfolder_name: benchmark_1
+  name: benchmark_1
