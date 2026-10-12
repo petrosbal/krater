@@ -13,8 +13,9 @@
 #include <math.h>
 #include <ctype.h>
 #include <string.h>
+#include <unistd.h>
 
-//====== WORKLOAD-DEFINED FUNCTIONS (YOU WRITE THESE IN YOUR .C FILE) ===========
+//====== WORKLOAD-DEFINED FUNCTIONS (WRITE THESE IN YOUR .C FILE) ==============
 
 // called once, before warmup and before timing starts
 // useful for memory allocation and krater_param_* value reads.
@@ -156,6 +157,12 @@ static void runner_print_result(long units, double elapsed) {
 }
 
 int main(void) {
+    printf("MAIN_START\n"); fflush(stdout);
+
+    // Kubernetes takes some time to report when a container starts (~1 s), so the harness
+    // can't start sampling until that. the cgroup path discovery isnt instant either (~200ms).
+    sleep(2); // measured worst case was 1.4 seconds
+
     double duration = krater_param_double("KRATER_DURATION", 30.0);
     double warmup_duration = krater_param_double("KRATER_WARMUP", 0.0);
     bench_setup();
