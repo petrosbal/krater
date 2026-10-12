@@ -1,48 +1,66 @@
 import pytest
-from config import load_config, validate
+from config import load_config, load_environments, validate
+
+environments = load_environments()
 
 def test_blueprint_passes():
-    assert validate(load_config()) is None
+    assert validate(load_config(), environments) is None
 
 def test_refuses_empty_config():
-    assert validate(None) == "config is empty or not a valid dict"
+    assert validate(None, environments) == "config is empty or not a valid dict"
 
 def test_refuses_unknown_top_level_key():
     config = load_config()
     config['build'] = {}
-    assert validate(config) == "unknown top-level keys: build"
+    assert validate(config, environments) == "unknown top-level keys: build"
 
 def test_refuses_run_not_a_dict():
     config = load_config()
     config['run'] = [1]
-    assert validate(config) == "'run' must be a dict"
+    assert validate(config, environments) == "'run' must be a dict"
 
 def test_refuses_unknown_run_key():
     config = load_config()
     config['run']['foo'] = 1
-    assert validate(config) == "'run' has unknown keys: foo"
+    assert validate(config, environments) == "'run' has unknown keys: foo"
+
+def test_refuses_bool_run_key():
+    config = load_config()
+    config['run'][True] = 1
+    assert validate(config, environments) == "'run' has unknown keys: True"
 
 def test_refuses_missing_run_key():
     config = load_config()
     del config['run']['timeout']
-    assert validate(config) == "'run' missing required keys: timeout"
+    assert validate(config, environments) == "'run' missing required keys: timeout"
 
 @pytest.mark.parametrize("key, value, expected", [
-    ("duration",  0,            "'duration' must be a positive number, got 0"),
-    ("trials",    True,         "'trials' must be a positive integer, got True"),
-    ("warmup",    -1,           "'warmup' must be a non-negative number, got -1"),
-    ("interval",  float('nan'), "'interval' must be a number >= 0.1, got nan"),
-    ("cpu",       "",           "'cpu' must be a non-empty string, got ''"),
-    ("memory",    1024,         "'memory' must be a non-empty string, got 1024"),
-    ("namespace", " ",          "'namespace' must be a non-empty string, got ' '"),
-    ("name",      69,           "'name' must be a string, got 69"),
-    ("name",      "../x",       "'name' must start with a letter or digit and hold only letters, digits, _ and -"),
-    ("name",      "bench\n",    "'name' must start with a letter or digit and hold only letters, digits, _ and -"),
-    ("timeout",   120.0,        "'timeout' must be an integer, got 120.0"),
-    ("timeout",   72,           "'timeout' must be above duration + warmup + 2 (72), got 72")
-
+    ("duration",  0,                 "'duration' must be a positive number, got 0"),
+    ("trials",    True,              "'trials' must be a positive integer, got True"),
+    ("warmup",    -1,                "'warmup' must be a non-negative number, got -1"),
+    ("interval",  float('nan'),      "'interval' must be a number >= 0.1, got nan"),
+    ("cpu",       "",                "'cpu' must be a non-empty string, got ''"),
+    ("memory",    1024,              "'memory' must be a non-empty string, got 1024"),
+    ("namespace", " ",               "'namespace' must be a non-empty string, got ' '"),
+    ("name",      69,                "'name' must be a string, got 69"),
+    ("name",      "../x",            "'name' must start with a letter or digit and hold only letters, digits, _ and -"),
+    ("name",      "bench\n",         "'name' must start with a letter or digit and hold only letters, digits, _ and -"),
+    ("timeout",   120.0,             "'timeout' must be an integer, got 120.0"),
+    ("timeout",   72,                "'timeout' must be above duration + warmup + 2 (72), got 72"),
+    ("params",    [256],             "'params' must be a dict, got [256]"),
+    ("params",    {1: [256]},        "parameter name 1 must be a letter followed by letters, digits or _"),
+    ("params",    {"size\n": [1]},   "parameter name 'size\\n' must be a letter followed by letters, digits or _"),
+    ("params",    {"KRATER_N": [1]}, "parameter name 'KRATER_N' is reserved: use a different prefix"),
+    ("params",    {"n": 256},        "values for parameter 'n' must be in a list"),
+    ("params",    {"n": []},         "no values for parameter 'n'"),
+    ("params",    {"n": [1, True]},  "values for parameter 'n' must be numbers or strings"),
+    ("params",    {"n": [1, 1]},     "parameter 'n' has duplicate values"),
+    ("runtimes",  [],                "'runtimes' must be a non-empty list"),
+    ("runtimes",  "wasmtime",        "'runtimes' must be a non-empty list"),
+    ("runtimes",  ["wasmtime", 1],   "'runtimes' must contain strings only"),
+    ("runtimes",  ["wasmtime", "a"], "unknown runtimes detected: a (available runtimes are: default, wasmedge, wasmer, wasmtime)"),
 ])
 def test_refuses_bad_run_value(key, value, expected):
     config = load_config()
     config['run'][key] = value
-    assert validate(config) == expected
+    assert validate(config, environments) == expected

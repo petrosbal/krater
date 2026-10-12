@@ -17,6 +17,7 @@ import yaml
 import re
 
 CONFIG_FILE = 'krater.yaml'
+ENVIRONMENTS_FILE = "dockerfile_gen/generated/available_environments.yaml"
 RUNNER_SLEEP = 2 # from workload_runner.h
 RUN_KEYS = frozenset({
     "name",
@@ -36,20 +37,27 @@ def load_config() -> dict:
     with open(CONFIG_FILE, 'r') as f:
         return yaml.safe_load(f)
 
+def load_environments() -> list:
+    with open(ENVIRONMENTS_FILE, 'r') as f:
+        return yaml.safe_load(f)['environments']
+
 def is_number(value) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
-def validate(config) -> str | None:
+def select_environments(environments: list, runtimes: list) -> list:
+    return [env for env in environments if env['runtime_class'] in runtimes]
+
+def validate(config, environments) -> str | None:
     if not isinstance(config, dict):
         return "config is empty or not a valid dict"
     if unknown := set(config) - {"run"}:
-        return f"unknown top-level keys: {', '.join(sorted(unknown))}"
+        return f"unknown top-level keys: {', '.join(sorted(map(str, unknown)))}"
     
     run = config.get('run')
     if not isinstance(run, dict):
         return "'run' must be a dict"
     if unknown := run.keys() - RUN_KEYS:
-        return f"'run' has unknown keys: {', '.join(sorted(unknown))}"
+        return f"'run' has unknown keys: {', '.join(sorted(map(str,unknown)))}"
     if missing := RUN_KEYS - run.keys():
         return f"'run' missing required keys: {', '.join(sorted(missing))}"
 
@@ -82,7 +90,40 @@ def validate(config) -> str | None:
 
     name = run['name']
     if not isinstance(name, str):
-        return (f"'name' must be a string, got {name!r}")
-    if not re.fullmatch(r'^[a-zA-Z0-9][a-zA-Z0-9_\-]*$', name):
+        return f"'name' must be a string, got {name!r}"
+    if not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_\-]*', name):
         return ("'name' must start with a letter or digit "
                     "and hold only letters, digits, _ and -")
+
+    runtimes = run['runtimes']
+    if not isinstance(runtimes, list) or runtimes == []:
+        return "'runtimes' must be a non-empty list"
+    if not all(isinstance(runtime, str) for runtime in runtimes):
+        return "'runtimes' must contain strings only"
+
+    available = {env['runtime_class'] for env in environments}
+    if unknown := set(runtimes) - available:
+        return (f"unknown runtimes detected: {', '.join(sorted(unknown))} "
+                 f"(available runtimes are: {', '.join(sorted(available))})")
+
+    return validate_params(run['params'])
+
+
+def validate_params(params) -> str | None:
+    if not isinstance(params, dict):
+        return f"'params' must be a dict, got {params!r}"
+
+    for name, valuelist in params.items():
+        if not isinstance(name, str) or not re.fullmatch(r'[a-zA-Z][a-zA-Z0-9_]*', name):
+            return f"parameter name {name!r} must be a letter followed by letters, digits or _"
+        if name.startswith("KRATER_"):
+            return f"parameter name {name!r} is reserved: use a different prefix"
+        if not isinstance(valuelist, list):
+            return f"values for parameter {name!r} must be in a list"
+        if valuelist == []:
+            return f"no values for parameter {name!r}"
+        for value in valuelist:
+            if not is_number(value) and not isinstance(value, str):
+                return f"values for parameter {name!r} must be numbers or strings"
+        if len(valuelist) != len(set(valuelist)):
+            return f"parameter {name!r} has duplicate values"
