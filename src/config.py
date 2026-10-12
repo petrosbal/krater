@@ -125,5 +125,9 @@ def validate_params(params) -> str | None:
         for value in valuelist:
             if not is_number(value) and not isinstance(value, str):
                 return f"values for parameter {name!r} must be numbers or strings"
-        if len(valuelist) != len(set(valuelist)):
-            return f"parameter {name!r} has duplicate values"
+            if isinstance(value, str) and any(c in value for c in [',', '=']):
+                return f"value {value!r} contains ',' or '='"
+        if len(valuelist) != len(set(valuelist)): # values that are the same number written differently
+            return f"parameter {name!r} has duplicate values" # like 256 and 256.0
+        if len(valuelist) != len({str(v) for v in valuelist}): # values that look the same to the pod
+            return f"parameter {name!r} has duplicate values" # like 256 and '256'
