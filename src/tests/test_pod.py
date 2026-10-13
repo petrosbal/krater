@@ -33,3 +33,77 @@ PARSE_LOG_LINE_ROWS = {
 )
 def test_parse_log_line(line, expected):
     assert pod.parse_log_line(line) == expected
+MANIFEST_RUN = {
+    'namespace': 'bench',
+    'cpu': '500m',
+    'memory': '256Mi',
+    'timeout': 90,
+    'trials': 30,
+    'duration': 60,
+}
+
+MANIFEST_VARS = {'size': '256', 'KRATER_DURATION': '60.0', 'KRATER_WARMUP': '10.0'}
+
+POD_MANIFEST_ROWS = {
+    "runc: no runtimeClassName": (
+        {'target': 'native', 'image': 'krater:matmul_native', 'runtime_class': 'default'},
+        {
+            'apiVersion': 'v1',
+            'kind': 'Pod',
+            'metadata': {'name': 'krater-trial', 'namespace': 'bench'},
+            'spec': {
+                'restartPolicy': 'Never',
+                'activeDeadlineSeconds': 90,
+                'terminationGracePeriodSeconds': 0,
+                'containers': [{
+                    'name': 'krater-workload',
+                    'image': 'krater:matmul_native',
+                    'imagePullPolicy': 'Never',
+                    'env': [
+                        {'name': 'size', 'value': '256'},
+                        {'name': 'KRATER_DURATION', 'value': '60.0'},
+                        {'name': 'KRATER_WARMUP', 'value': '10.0'},
+                    ],
+                    'resources': {
+                        'requests': {'cpu': '500m', 'memory': '256Mi'},
+                        'limits': {'cpu': '500m', 'memory': '256Mi'},
+                    },
+                }],
+            },
+        },
+    ),
+    "shim: runtimeClassName set": (
+        {'target': 'wasm', 'image': 'krater:matmul_wasm', 'runtime_class': 'wasmtime'},
+        {
+            'apiVersion': 'v1',
+            'kind': 'Pod',
+            'metadata': {'name': 'krater-trial', 'namespace': 'bench'},
+            'spec': {
+                'restartPolicy': 'Never',
+                'activeDeadlineSeconds': 90,
+                'terminationGracePeriodSeconds': 0,
+                'runtimeClassName': 'wasmtime',
+                'containers': [{
+                    'name': 'krater-workload',
+                    'image': 'krater:matmul_wasm',
+                    'imagePullPolicy': 'Never',
+                    'env': [
+                        {'name': 'size', 'value': '256'},
+                        {'name': 'KRATER_DURATION', 'value': '60.0'},
+                        {'name': 'KRATER_WARMUP', 'value': '10.0'},
+                    ],
+                    'resources': {
+                        'requests': {'cpu': '500m', 'memory': '256Mi'},
+                        'limits': {'cpu': '500m', 'memory': '256Mi'},
+                    },
+                }],
+            },
+        },
+    ),
+}
+
+@pytest.mark.parametrize("environment, expected",
+    POD_MANIFEST_ROWS.values(), ids=POD_MANIFEST_ROWS.keys(),
+)
+def test_pod_manifest(environment, expected):
+    assert pod.manifest(environment, MANIFEST_VARS, MANIFEST_RUN) == expected
