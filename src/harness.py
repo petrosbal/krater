@@ -96,3 +96,13 @@ def save_results(path: Path, results: dict) -> None:
     with open(tmp, "w") as f:
         json.dump(results, f, indent=2)
     os.replace(tmp, path)
+
+def parse_result(texts: list[str]) -> dict | None:
+    for text in texts:
+        if text.startswith(prefix := "BENCH_RESULT "):
+            try:
+                result = json.loads(text.removeprefix(prefix))
+                return result if isinstance(result, dict) else None
+            except json.JSONDecodeError:
+                return None
+    return None

@@ -243,3 +243,44 @@ def test_failed_save_keeps_file(tmp_path):
     with pytest.raises(TypeError):
         harness.save_results(path, {"b": object()})
     assert harness.load_results(path) == {"a": 1}
+
+PARSE_RESULT_ROWS = {
+    "normal result": (
+        ['MAIN_START', 'BENCH_START', 'BENCH_END', 'BENCH_RESULT {"units": 5, "valid": true}'],
+        {'units': 5, 'valid': True},
+    ),
+    "no result line": (
+        ['MAIN_START', 'BENCH_START'],
+        None,
+    ),
+    "broken json": (
+        ['BENCH_RESULT {"units": 5'],
+        None,
+    ),
+    "noise before it": (
+        ['libunwind: __unw_add_dynamic_fde: bad fde', 'BENCH_RESULT {"a": 1}'],
+        {'a': 1},
+    ),
+    "json but not an object": (
+        ['BENCH_RESULT [1, 2]'],
+        None,
+    ),
+    "empty object counts": (
+        ['BENCH_RESULT {}'],
+        {},
+    ),
+    "first one wins": (
+        ['BENCH_RESULT {"a": 1}', 'BENCH_RESULT {"a": 2}'],
+        {'a': 1},
+    ),
+    "similar line before it": (
+        ['BENCH_RESULTS follow', 'BENCH_RESULT {"a": 1}'],
+        {'a': 1},
+    ),
+}
+
+@pytest.mark.parametrize("texts, expected",
+    PARSE_RESULT_ROWS.values(), ids=PARSE_RESULT_ROWS.keys(),
+)
+def test_parse_result(texts, expected):
+    assert harness.parse_result(texts) == expected
