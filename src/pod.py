@@ -15,8 +15,10 @@
 
 import json
 import subprocess
-from datetime import datetime
+import threading
 import time
+from datetime import datetime
+from collections.abc import Iterator
 
 POD_NAME = "krater-trial"
 
@@ -80,3 +82,20 @@ def failure_reason(namespace: str) -> str:
     container_reason = kubectl("get", "pod", POD_NAME, "-n", namespace, 
                                "-o", "jsonpath={.status.containerStatuses[0].state.terminated.reason}")
     return pod_reason or container_reason # first non empty one
+
+def stream_logs(namespace: str, timeout: float) -> Iterator[tuple[float, str]]:
+    proc = subprocess.Popen(["kubectl", "logs", "-f", "--timestamps", POD_NAME, "-n", namespace],
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    assert proc.stdout is not None and proc.stderr is not None
+    watchdog = threading.Timer(timeout, proc.kill)
+    watchdog.start()
+
+    try:
+        for line in proc.stdout:
+            yield parse_log_line(line.removesuffix("\n"))
+        if proc.wait() > 0:
+            raise RuntimeError(proc.stderr.read().strip())
+    finally:
+        watchdog.cancel()
+        proc.kill()
+        proc.wait()
