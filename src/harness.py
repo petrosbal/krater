@@ -16,8 +16,20 @@
 import itertools
 import json
 import os
+import threading
 from pathlib import Path
+
 from config import is_number
+import cgroup
+import pod
+
+FAILURE_REASONS = ["OOMKilled", "Error", "DeadlineExceeded"]
+
+MARKER_TIMES = {
+    "MAIN_START": "main_start",
+    "BENCH_START": "bench_start",
+    "BENCH_END": "bench_end"
+}
 
 # cartesian product. takes {'size': [5, 10], 'mode': ['a', 'b']} and returns
 #       1. {'size': 5,  'mode': 'a'}
@@ -70,6 +82,8 @@ def header_mismatch(stored: dict, header: dict) -> str | None:
         return f"expected 'trials' section in stored file to be a dict, got {type(trials).__name__}"
 
 def trial_is_done(entry: dict) -> bool:
+    if entry.get('failure_reason') in FAILURE_REASONS:
+        return True
     if entry.get('result') is None:
         return False
     times = entry.get('times', {})
@@ -106,3 +120,53 @@ def parse_result(texts: list[str]) -> dict | None:
             except json.JSONDecodeError:
                 return None
     return None
+
+def run_trial(run: dict, environment: dict, combination: dict, trial_num: int) -> dict:
+    trial_vars = trial_env(combination, run['duration'], run['warmup'])
+    manifest = pod.manifest(environment, trial_vars, run)
+    stop = threading.Event()
+    samples = []
+    monitor = None
+    failure_reason = None
+
+    try:
+        times = {"applied": pod.start(manifest)}
+        container_id = pod.container_id(run['namespace'], run['timeout'])
+        cgroup_path = cgroup.find_cgroup(container_id)
+        missing = cgroup.missing_fields(cgroup_path)
+        monitor = threading.Thread(
+            target = cgroup.sample_until,
+            args = (cgroup_path, missing, run['interval'], stop, samples)
+        )
+        monitor.start()
+        texts = []
+        # the deadline's kill ends the stream a few seconds late
+        # a watchdog that fires first would leave the failure reason empty
+        for stamp, text in pod.stream_logs(run['namespace'], run['timeout'] + 10):
+            texts.append(text)
+            if text in MARKER_TIMES:
+                times[MARKER_TIMES[text]] = stamp
+                special_sample = cgroup.take_sample(cgroup_path, missing)
+                if special_sample is not None:
+                    samples.append(special_sample)
+
+        result = parse_result(texts)
+        if result is None:
+            failure_reason = pod.failure_reason(run['namespace'])
+
+    finally:
+        stop.set()
+        if monitor is not None:
+            monitor.join()
+        pod.delete(run['namespace'])
+
+    samples.sort(key = lambda s: s['timestamp'])
+    entry = { "trial": trial_num,
+              "times": times,
+              "log": texts,
+              "result": result,
+              "samples": samples}
+    if failure_reason is not None:
+        entry['failure_reason'] = failure_reason
+
+    return entry

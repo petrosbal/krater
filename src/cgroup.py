@@ -43,6 +43,7 @@ def take_sample(cgroup_path: Path, missing: set[str]) -> dict | None:
     try:
         mem = read_flat_file(cgroup_path / "memory.stat")
         cpu = read_flat_file(cgroup_path / "cpu.stat")
+        # the line for cpu_wait_usec looks like "some avg10=0.00 avg60=0.00 avg300=0.00 total=3048408"
         cpu_wait_usec = int((cgroup_path / "cpu.pressure").read_text().split()[4].split("=")[1])
 
         return {

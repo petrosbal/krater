@@ -18,7 +18,7 @@ import re
 
 CONFIG_FILE = 'krater.yaml'
 ENVIRONMENTS_FILE = "dockerfile_gen/generated/available_environments.yaml"
-RUNNER_SLEEP = 2 # from workload_runner.h
+RUNNER_SLEEP = 2 # the first sleep from workload_runner.h
 RUN_KEYS = frozenset({
     "name",
     "params",

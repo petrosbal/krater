@@ -165,54 +165,46 @@ def test_header_mismatch(stored, expected):
 TRIAL_IS_DONE_ROWS = {
     "invalid result is done": (
         {'result': {'valid': False}, 'times': {'bench_start': 103.0, 'bench_end': 105.0},
-         'samples': [{'timestamp': 101.0}, {'timestamp': 103.2}, {'timestamp': 105.1}]},
-        True,
-    ),
+         'samples': [{'timestamp': 101.0}, {'timestamp': 103.2}, {'timestamp': 105.1}]}, True),
     "no result": (
         {'times': {'bench_start': 103.0, 'bench_end': 105.0},
-         'samples': [{'timestamp': 101.0}, {'timestamp': 103.2}, {'timestamp': 105.1}]},
-        False,
-    ),
+         'samples': [{'timestamp': 101.0}, {'timestamp': 103.2}, {'timestamp': 105.1}]}, False),
     "empty result is done": (
         {'result': {}, 'times': {'bench_start': 103.0, 'bench_end': 105.0},
-         'samples': [{'timestamp': 101.0}, {'timestamp': 103.2}, {'timestamp': 105.1}]},
-        True,
-    ),
+         'samples': [{'timestamp': 101.0}, {'timestamp': 103.2}, {'timestamp': 105.1}]}, True),
     "no sample before the window": (
         {'result': {'valid': True}, 'times': {'bench_start': 103.0, 'bench_end': 105.0},
-         'samples': [{'timestamp': 103.2}, {'timestamp': 105.1}]},
-        False,
-    ),
+         'samples': [{'timestamp': 103.2}, {'timestamp': 105.1}]}, False),
     "no sample after the window": (
         {'result': {'valid': True}, 'times': {'bench_start': 103.0, 'bench_end': 105.0},
-         'samples': [{'timestamp': 101.0}, {'timestamp': 104.9}]},
-        False,
-    ),
+         'samples': [{'timestamp': 101.0}, {'timestamp': 104.9}]}, False),
     "samples exactly on the edges": (
         {'result': {'valid': True}, 'times': {'bench_start': 103.0, 'bench_end': 105.0},
-         'samples': [{'timestamp': 103.0}, {'timestamp': 105.0}]},
-        True,
-    ),
+         'samples': [{'timestamp': 103.0}, {'timestamp': 105.0}]}, True),
     "no start marker": (
         {'result': {'valid': True}, 'times': {'bench_end': 105.0},
-         'samples': [{'timestamp': 101.0}, {'timestamp': 105.1}]},
-        False,
-    ),
+         'samples': [{'timestamp': 101.0}, {'timestamp': 105.1}]}, False),
     "no end marker": (
         {'result': {'valid': True}, 'times': {'bench_start': 103.0},
-         'samples': [{'timestamp': 101.0}, {'timestamp': 105.1}]},
-        False,
-    ),
+         'samples': [{'timestamp': 101.0}, {'timestamp': 105.1}]}, False),
     "no samples": (
         {'result': {'valid': True}, 'times': {'bench_start': 103.0, 'bench_end': 105.0},
-         'samples': []},
-        False,
-    ),
+         'samples': []}, False),
     "samples out of time order": (
         {'result': {'valid': True}, 'times': {'bench_start': 103.0, 'bench_end': 105.0},
-         'samples': [{'timestamp': 105.1}, {'timestamp': 101.0}]},
-        True,
-    ),
+         'samples': [{'timestamp': 105.1}, {'timestamp': 101.0}]}, True),
+    "OOMKilled is done": (
+        {'failure_reason': 'OOMKilled'}, True),
+    "Error is done": (
+        {'failure_reason': 'Error'}, True),
+    "DeadlineExceeded is done": (
+        {'failure_reason': 'DeadlineExceeded'}, True),
+    "Completed with no result reruns": (
+        {'failure_reason': 'Completed'}, False),
+    "empty reason reruns": (
+        {'failure_reason': ''}, False),
+    "StartError reruns": (
+        {'failure_reason': 'StartError'}, False),
 }
 
 @pytest.mark.parametrize("entry, expected",
@@ -224,7 +216,7 @@ def test_trial_is_done(entry, expected):
 def test_load_missing_file(tmp_path):
     assert harness.load_results(tmp_path / "r.json") is None
 
-def test_save_then_load(tmp_path):
+def test_save_then_load(tmp_path: Path):
     path = tmp_path/"x"/"y"/"r.json"
     harness.save_results(path, {"a": 1})
     harness.save_results(path, {"a": 2})
