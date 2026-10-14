@@ -179,5 +179,9 @@ int main(void) {
 
     bench_report(units, elapsed);
     runner_print_result(units, elapsed);
+
+    // similarly, i force the cgroup to stay 2s more so that
+    // at least one sample after BENCH_END is recorded.
+    sleep(2);
 }
 #endif
