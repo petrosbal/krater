@@ -99,3 +99,7 @@ def stream_logs(namespace: str, timeout: float) -> Iterator[tuple[float, str]]:
         watchdog.cancel()
         proc.kill()
         proc.wait()
+
+def dry_run(manifest: dict) -> None:
+    delete(manifest['metadata']['namespace'])
+    kubectl("apply", "--dry-run=server", "-f", "-", stdin=json.dumps(manifest))

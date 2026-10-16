@@ -5,7 +5,7 @@ from pathlib import Path
 import harness
 
 def test_combinations():
-    value = harness.combinations({'size': [5, 10], 'mode': ['a', 'b']})
+    value = harness.param_combinations({'size': [5, 10], 'mode': ['a', 'b']})
     expected = [{'size': 5,  'mode': 'a'},
                 {'size': 5,  'mode': 'b'},
                 {'size': 10, 'mode': 'a'},
@@ -13,7 +13,7 @@ def test_combinations():
     assert value == expected
 
 def test_combinations_without_params():
-    assert harness.combinations({}) == [{}]
+    assert harness.param_combinations({}) == [{}]
 
 def test_trial_env():
     combination = {'size': 256}
@@ -276,3 +276,35 @@ PARSE_RESULT_ROWS = {
 )
 def test_parse_result(texts, expected):
     assert harness.parse_result(texts) == expected
+
+def results_file(image: str, trials: dict) -> dict:
+    return {'environment': {'image': image}, 'trials': trials}
+
+PENDING_TRIALS_ROWS = {
+    "a stored trial skips only its own number, size and file": (
+        [results_file('native', {'size = 64': [{'trial': 1}]}), results_file('wasm', {})],
+        [{'size': 64}, {'size': 512}], 2,
+        [                             (1, 'native', {'size': 512}),
+         (1, 'wasm',   {'size': 64}), (1, 'wasm',   {'size': 512}),
+         (2, 'native', {'size': 64}), (2, 'native', {'size': 512}),
+         (2, 'wasm',   {'size': 64}), (2, 'wasm',   {'size': 512})],
+    ),
+    "a gap before a stored trial is pending": (
+        [results_file('native', {'size = 64': [{'trial': 3}]})],
+        [{'size': 64}], 3,
+        [(1, 'native', {'size': 64}), (2, 'native', {'size': 64})],
+    ),
+    "the key comes from trial_key": (
+        [results_file('native', {'mode = fast, size = 64': [{'trial': 1}]})],
+        [{'size': 64, 'mode': 'fast'}], 1,
+        [],
+    ),
+}
+
+@pytest.mark.parametrize("files, combinations, trials, expected",
+    PENDING_TRIALS_ROWS.values(), ids=PENDING_TRIALS_ROWS.keys(),
+)
+def test_pending_trials(files, combinations, trials, expected):
+    pending = harness.pending_trials(files, combinations, trials)
+    got = [(n, file['environment']['image'], combination) for n, file, combination in pending]
+    assert got == expected

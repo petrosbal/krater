@@ -16,10 +16,11 @@
 import itertools
 import json
 import os
+import sys
 import threading
 from pathlib import Path
 
-from config import is_number
+from config import is_number, load_config, load_environments, select_environments, validate
 import cgroup
 import pod
 
@@ -36,7 +37,7 @@ MARKER_TIMES = {
 #       2. {'size': 5,  'mode': 'b'}
 #       3. {'size': 10, 'mode': 'a'}
 #       4. {'size': 10, 'mode': 'b'}
-def combinations(params: dict) -> list[dict]:
+def param_combinations(params: dict) -> list[dict]:
     value_combinations = itertools.product(*params.values())
     return [dict(zip(params.keys(), combination)) for combination in value_combinations]
 
@@ -170,3 +171,37 @@ def run_trial(run: dict, environment: dict, combination: dict, trial_num: int) -
         entry['failure_reason'] = failure_reason
 
     return entry
+
+def pending_trials(files: list[dict], combinations: list[dict], trials: int) -> list[tuple[int, dict, dict]]:
+    pending = []
+    for n in range(1, trials + 1):
+        for file in files:
+            for combination in combinations:
+                entries = file['trials'].get(trial_key(combination), [])
+                if not any(entry['trial'] == n for entry in entries):
+                    pending.append((n, file, combination))
+    return pending
+
+def main() -> None:
+    config = load_config()
+    environments = load_environments()
+
+    msg = validate(config, environments)
+    if msg is not None:
+        sys.exit(f"config: {msg}")
+
+    run = config['run']
+    selected_envs = select_environments(environments, run['runtimes'])
+    combinations = param_combinations(run['params'])
+    manifest = pod.manifest(selected_envs[0], 
+                            trial_env(combinations[0], run['duration'], run['warmup']), 
+                            run)
+
+    try:
+        pod.dry_run(manifest)
+    except RuntimeError as e:
+        sys.exit(f"Dry run failed with cpu = {run['cpu']}, memory = {run['memory']} in namespace {run['namespace']}\n"
+                 f"kubernetes failed with error: {e}")
+
+if __name__ == "__main__":
+    main()
