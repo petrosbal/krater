@@ -29,6 +29,7 @@ render_environment(OutStream, Target, ImageName, RuntimeClass):-
 %!  render_environments(OutStream).
 %       Renders the whole file to OutStream.
 render_environments(OutStream):-
+    collision_free_build,
     render_header(OutStream),
     nl(OutStream),
     write(OutStream, 'environments:'),
