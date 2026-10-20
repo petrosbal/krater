@@ -152,6 +152,22 @@ def test_keep_entry_failed_save_leaves_file_unchanged(tmp_path, monkeypatch):
         harness.keep_entry(run, file, {'size': 64}, {'trial': 1, 'failure_reason': 'OOMKilled'})
     assert file['trials'] == {}
 
+def test_run_rounds_stops_properly(monkeypatch, capsys):
+    def keyboard_interrupt(run, environment, combination, trial_num):
+        raise KeyboardInterrupt
+    monkeypatch.setattr(harness, 'run_trial', keyboard_interrupt)
+
+    run = {'trials': 1}
+    files = [{'environment': {'target': 'wasm', 'runtime_class': 'wasmtime'}}]
+    combinations = [{'size': 1024}]
+    pending = [(1, files[0], combinations[0])]
+    loop_started = 0.0
+    assert harness.run_rounds(run, files, combinations, pending, loop_started) == ([], True)
+
+    captured = capsys.readouterr()
+    assert captured.out.endswith("size = 1024  \n")
+    assert captured.err == "stopped by Ctrl-C\n"
+
 HEADER = {
     'environment': {'target': 'wasm'},
     'settings': {'cpu': '1000m', 'duration': 2},

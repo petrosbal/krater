@@ -356,39 +356,45 @@ def closing_block(run: dict, files: list[dict], combinations: list[dict], to_rer
             f"\n{summary_table(files, combinations, run['trials'])}")
 
 def run_rounds(run: dict, files: list[dict], combinations: list[dict], pending: list,
-               to_rerun: list[str], loop_started: float) -> None:
+               loop_started: float) -> tuple[list[str], bool]:
     current_round = 0
+    to_rerun = []
     col_widths = widths(files, combinations)
-    for k, (n, file, combination) in enumerate(pending, 1):
-        if n != current_round:
-            print(round_line(n, run['trials'], k, len(pending), time.time() - loop_started))
-            current_round = n
+    try:
+        for k, (n, file, combination) in enumerate(pending, 1):
+            if n != current_round:
+                print(round_line(n, run['trials'], k, len(pending), time.time() - loop_started))
+                current_round = n
 
-        label = trial_label(file, combination, col_widths)
-        line = trial_identity(k, len(pending), label)
-        print(line, end='', flush=True)
+            label = trial_label(file, combination, col_widths)
+            line = trial_identity(k, len(pending), label)
+            print(line, end='', flush=True)
 
-        started = time.time()
+            started = time.time()
+            try:
+                entry = run_trial(run, file['environment'], combination, n)
+            # kubectl(), find_cgroup() and stream_logs() throw Runtime
+            # a cgroup file that vanished or kubectl missing would be OS
+            # and a bad log timestamp would be Value
+            except (RuntimeError, OSError, ValueError) as e:
+                error_text = str(e).split('\n')[0] or type(e).__name__
+                outcome = outcome_line('incomplete', time.time() - started, f"{error_text}, runs again next time")
+                print(outcome)
+                to_rerun.append(line + outcome)
+                continue
 
-        try:
-            entry = run_trial(run, file['environment'], combination, n)
-        # kubectl(), find_cgroup() and stream_logs() throw Runtime
-        # a cgroup file that vanished or kubectl missing would be OS
-        # and a bad log timestamp would be Value
-        except (RuntimeError, OSError, ValueError) as e:
-            error_text = str(e).split('\n')[0] or type(e).__name__
-            outcome = outcome_line('incomplete', time.time() - started, f"{error_text}, runs again next time")
+            done = keep_entry(run, file, combination, entry)
+            outcome = trial_outcome(entry, time.time() - started)
             print(outcome)
-            to_rerun.append(line + outcome)
-            continue
 
-        done = keep_entry(run, file, combination, entry)
+            if not done:
+                to_rerun.append(line + outcome)
+    except KeyboardInterrupt:
+        print(flush=True)
+        print("stopped by Ctrl-C", file=sys.stderr)
+        return to_rerun, True
 
-        outcome = trial_outcome(entry, time.time() - started)
-        print(outcome)
-
-        if not done:
-            to_rerun.append(line + outcome)
+    return to_rerun, False
 
 def outcome_line(word: str, seconds: float, detail: str = '') -> str:
     detail_text = f"  {detail}" if detail else ""
@@ -430,13 +436,7 @@ def main() -> None:
             return
 
     loop_started = time.time()
-    to_rerun = []
-    stopped = False
-    try:
-        run_rounds(run, files, combinations, pending, to_rerun, loop_started)
-    except KeyboardInterrupt:
-        print("stopped by Ctrl-C, pod deleted, no result saved")
-        stopped = True
+    to_rerun, stopped = run_rounds(run, files, combinations, pending, loop_started)
 
     print(closing_block(run, files, combinations, to_rerun, 
                         time.time() - loop_started, 'stopped' if stopped else 'finished'))
