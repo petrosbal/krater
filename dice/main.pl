@@ -29,14 +29,14 @@ opt_help(architecture, "Target architecture, e.g. x86_64 or aarch64").
 opt_meta(architecture, "ARCH").
 
 % ==============================================================================
-%!  or_refuse(Goal, Reason).
+%!  call_or_throw(Goal, Reason).
 %       Runs Goal, and throws refused(Reason) when it has no solution. Failure
 %       carries no reason of its own, so without the throw main/1 could only
 %       report that something went wrong.
-or_refuse(Goal, _):-
+call_or_throw(Goal, _):-
     call(Goal), !.
 
-or_refuse(_, Reason):-
+call_or_throw(_, Reason):-
     throw(refused(Reason)).
 
 % ==============================================================================
@@ -45,12 +45,11 @@ or_refuse(_, Reason):-
 %       two files. Throws refused/1 at each point that can have no answer.
 generate(Argv):-
     argv_options(Argv, Positional, Options),
-    or_refuse(Positional == [], unexpected_arguments(Positional)),
-    or_refuse(option(architecture(Architecture), Options), no_architecture),
-    or_refuse(load_build_facts('build.yaml', Architecture), rejected_config),
-    or_refuse(write_dockerfile(
-        'dice/generated/Dockerfile'), underivable),
-    or_refuse(write_environments(
+    call_or_throw(Positional == [], unexpected_arguments(Positional)),
+    call_or_throw(option(architecture(Architecture), Options), no_architecture),
+    call_or_throw(load_build_facts('build.yaml', Architecture), rejected_config),
+    call_or_throw(write_dockerfile('dice/generated/Dockerfile'), underivable),
+    call_or_throw(write_environments(
         'dice/generated/available_environments.yaml'), underivable).
 
 % ==============================================================================
