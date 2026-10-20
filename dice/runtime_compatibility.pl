@@ -1,12 +1,11 @@
 %%% runtime_compatibility.pl
 %%%
-%%% Pairs each target with the runtime classes it may execute under, and names
-%%% the image it runs in. A pairing with no clause here can't be written, so
-%%% an invalid environment never reaches the harness.
+%%% Pairs each target with the runtime classes it may execute under. A pairing
+%%% with no clause here can't be written, so an invalid environment never
+%%% reaches the harness.
 
-:- module(runtime_compatibility, [environment/3]).
+:- module(runtime_compatibility, [environment/2]).
 :- use_module(build_facts).
-:- use_module(derivation).
 
 % ==============================================================================
 %!  wasm_shim(Runtime).
@@ -43,17 +42,9 @@ runs_under(Target, Runtime):-
     wasm_shim(Runtime).
 
 % ==============================================================================
-%!  target_image_name(Target, ImageName).
-%       Succeeds when ImageName is the image the target runs in.
-target_image_name(Target, ImageName):-
-    workload_basename(WorkloadName),
-    atomic_list_concat([krater, ':', WorkloadName, '_', Target], ImageName).
-
-% ==============================================================================
-%!  environment(Target, ImageName, RuntimeClass).
-%       Succeeds when the image may run under the runtime class. One answer
+%!  environment(Target, RuntimeClass).
+%       Succeeds when the target may run under the runtime class. One answer
 %       for each environment the harness can measure.
-environment(Target, ImageName, RuntimeClass):-
+environment(Target, RuntimeClass):-
     target(Target),
-    runs_under(Target, RuntimeClass),
-    target_image_name(Target, ImageName).
+    runs_under(Target, RuntimeClass).

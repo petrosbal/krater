@@ -22,7 +22,7 @@
                         toolchain_asset/3,
                         duplicate_targets/2,
                         stage_name_collision/1,
-                        workload_basename/1 ]).
+                        target_image_name/2]).
 :- use_module(library(lists), [append/2, member/2, last/2]).
 :- use_module(library(ugraphs), [top_sort/2, vertices_edges_to_ugraph/3]).
 :- use_module(build_facts).
@@ -333,6 +333,13 @@ stage_order(Stages):-
 target_shipped_filename(Target, Filename):-
     target_last_step(Target, Step),
     step_filename(Step, Filename).
+
+% ==============================================================================
+%!  target_image_name(Target, ImageName).
+%       Succeeds when ImageName is the image the target runs in.
+target_image_name(Target, ImageName):-
+    workload_basename(WorkloadName),
+    atomic_list_concat([krater, ':', WorkloadName, '_', Target], ImageName).
 
 % ==============================================================================
 %!  target_entrypoint(Target, Path).

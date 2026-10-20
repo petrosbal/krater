@@ -5,6 +5,7 @@
 
 :- module(environments_writer, [write_environments/1]).
 :- use_module(runtime_compatibility).
+:- use_module(derivation).
 
 % ==============================================================================
 %!  render_header(OutStream).
@@ -31,7 +32,8 @@ render_environments(OutStream):-
     render_header(OutStream),
     nl(OutStream),
     write(OutStream, 'environments:'),
-    forall(environment(Target, ImageName, RuntimeClass),
+    forall(( environment(Target, RuntimeClass),
+             target_image_name(Target, ImageName) ),
            render_environment(OutStream, Target, ImageName, RuntimeClass)).
 
 % ==============================================================================
