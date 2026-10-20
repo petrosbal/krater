@@ -33,7 +33,7 @@ A benchmarking framework for comparing WebAssembly and Linux container runtime e
 
     * **matmul/matmul.c**: Standard matrix multiplication with validity check. Reports throughput in MFLOPS.
 
-* **dockerfile_gen/generated/Dockerfile**: Multi-stage build file, generated from `build.yaml`, defining four targets:
+* **dice/generated/Dockerfile**: Multi-stage build file, generated from `build.yaml`, defining four targets:
     * `native`: GCC, dynamically linked (Debian Slim)
     * `native-static`: GCC, statically linked (Scratch)
     * `wasm`: WebAssembly build using WASI SDK (Scratch)

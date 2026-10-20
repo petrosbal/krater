@@ -31,7 +31,7 @@ from pathlib import Path
 from single_env_orch import param_combinations
 
 YAML_FILE = "src/bench_config.yaml"
-ENVIRONMENTS_FILE = "dockerfile_gen/generated/available_environments.yaml"
+ENVIRONMENTS_FILE = "dice/generated/available_environments.yaml"
 SCRIPT_NAME = "src/single_env_orch.py"
 PYTHON_EXEC = sys.executable # i use the orchestrator's interpreter for the single env script
 
@@ -77,7 +77,7 @@ def validate_config(config) -> bool:
         print("YAML error: config is empty or not a valid mapping")
         return False
 
-    # environments come from dockerfile_gen/generated/, so only shared_args belongs here
+    # environments come from dice/generated/, so only shared_args belongs here
     unknown = set(config) - {"shared_args"}
     if unknown:
         print(f"YAML error: unknown top-level keys: {sorted(unknown)}")

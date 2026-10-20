@@ -41,7 +41,7 @@ jobs:
       - name: Run hadolint
         uses: hadolint/hadolint-action@v3.1.0
         with:
-          dockerfile: dockerfile_gen/generated/Dockerfile
+          dockerfile: dice/generated/Dockerfile
           # DL3059 flags consecutive RUNs because each is a layer that ships.
           # Every RUN here is in a builder stage whose layers are discarded.
           ignore: DL3059

@@ -49,9 +49,9 @@ generate(Argv):-
     or_refuse(option(architecture(Architecture), Options), no_architecture),
     or_refuse(load_build_facts('build.yaml', Architecture), rejected_config),
     or_refuse(write_dockerfile(
-        'dockerfile_gen/generated/Dockerfile'), underivable),
+        'dice/generated/Dockerfile'), underivable),
     or_refuse(write_environments(
-        'dockerfile_gen/generated/available_environments.yaml'), underivable).
+        'dice/generated/available_environments.yaml'), underivable).
 
 % ==============================================================================
 %!  main(Argv).

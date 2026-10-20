@@ -20,8 +20,8 @@ build-images: ## Build all targets and import to k3s *
 	@echo "Importing to k3s..."
 	@bash -o pipefail -c 'docker save $(IMAGES) | sudo k3s ctr images import - > /dev/null'
 
-dockerfile-generation: ## Generate dockerfile_gen/generated/ from build.yaml *
-	@swipl dockerfile_gen/main.pl --arch=$(ARCH)
+dockerfile-generation: ## Generate dice/generated/ from build.yaml *
+	@swipl dice/main.pl --arch=$(ARCH)
 
 check-deps: ## Check all required tools are installed
 	@bash scripts/check-deps.sh
