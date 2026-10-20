@@ -2,7 +2,11 @@ import pytest
 import os
 import json
 from pathlib import Path
+from config import RUN_KEYS
 import harness
+
+def test_every_run_key_is_placed():
+    assert RUN_KEYS - set(harness.SETTINGS) == {"name", "params", "runtimes", "trials", "namespace"}
 
 def test_combinations():
     value = harness.param_combinations({'size': [5, 10], 'mode': ['a', 'b']})
@@ -48,7 +52,7 @@ RESULTS_HEADER_RUN = {
     'memory': '1023Mi',
     'interval': 0.2,
     'trials': 30,
-    'timeout': 120,
+    'timeout': 119,
     'namespace': 'default',
 }
 
@@ -68,20 +72,85 @@ def test_results_header():
         'settings': {
             'duration': 59,
             'warmup': 9,
+            'timeout': 119,
             'cpu': '999m',
             'memory': '1023Mi',
             'interval': 0.2,
         },
     }
 
-def test_own_file_passes_header_check(tmp_path):
-    path = tmp_path / "r.json"
-    header = harness.results_header(RESULTS_HEADER_RUN, RESULTS_HEADER_ENVIRONMENT)
-    harness.save_results(path, {**header, 'trials': {}})
-    loaded = harness.load_results(path)
-    assert loaded is not None
-    assert harness.header_mismatch(loaded, header) is None
+def test_file_for_without_a_file(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    file, problem = harness.file_for({**RESULTS_HEADER_RUN, 'name': 'b'}, RESULTS_HEADER_ENVIRONMENT)
+    expected = {**harness.results_header(RESULTS_HEADER_RUN, RESULTS_HEADER_ENVIRONMENT),
+                'trials': {}}
 
+    assert file == expected
+    assert problem == None
+
+def test_file_for_reopens_a_saved_file(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    saved = {**harness.results_header(RESULTS_HEADER_RUN, RESULTS_HEADER_ENVIRONMENT),
+             'trials': {'size = 64': [{'trial': 1}]}}
+    harness.save_results(harness.results_path('b', RESULTS_HEADER_ENVIRONMENT), saved)
+    file, problem = harness.file_for({**RESULTS_HEADER_RUN, 'name': 'b'}, RESULTS_HEADER_ENVIRONMENT)
+
+    assert file == saved
+    assert problem == None
+
+def test_file_for_refuses_a_changed_setting(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    saved = {**harness.results_header(RESULTS_HEADER_RUN, RESULTS_HEADER_ENVIRONMENT),
+             'trials': {}}
+    harness.save_results(harness.results_path('b', RESULTS_HEADER_ENVIRONMENT), saved)
+    file, problem = harness.file_for({**RESULTS_HEADER_RUN, 'name': 'b', 'cpu': '500m'},
+                                     RESULTS_HEADER_ENVIRONMENT)
+
+    assert file == None
+    assert problem == ("Existing results file (results/b/krater_matmul_wasm_wasmtime.json) does not match this run:\n"
+                       "settings:\n"
+                       "  file has [('cpu', '999m')]\n"
+                       "  config has [('cpu', '500m')]\n"
+                       "set the config back, use a new run name, or move the file")
+
+def test_keep_entry_saves_a_done_entry(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    run = {**RESULTS_HEADER_RUN, 'name': 'b'}
+    file, _ = harness.file_for(run, RESULTS_HEADER_ENVIRONMENT)
+    assert file is not None
+    entry = {'trial': 1, 'failure_reason': 'OOMKilled'}
+    done = harness.keep_entry(run, file, {'size': 64}, entry)
+
+    assert done is True
+    assert file['trials'] == {'size = 64': [entry]}
+    assert harness.file_for(run, RESULTS_HEADER_ENVIRONMENT) == (file, None)
+
+def test_keep_entry_drops_an_entry_that_is_not_done(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    run = {**RESULTS_HEADER_RUN, 'name': 'b'}
+    file, _ = harness.file_for(run, RESULTS_HEADER_ENVIRONMENT)
+    assert file is not None
+    done = harness.keep_entry(run, file, {'size': 64}, {'trial': 1, 'failure_reason': 'Completed'})
+
+    assert done is False
+    assert file['trials'] == {}
+    assert not harness.results_path('b', RESULTS_HEADER_ENVIRONMENT).exists()
+
+# keep_entry saves before it touches file, so a failed save can't leave
+# an entry in memory that the disk doesn't have
+def test_keep_entry_failed_save_leaves_file_unchanged(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    run = {**RESULTS_HEADER_RUN, 'name': 'b'}
+    file, problem = harness.file_for(run, RESULTS_HEADER_ENVIRONMENT)
+    assert file is not None
+
+    def failing_save(path, results):
+        raise OSError("disk full")
+    monkeypatch.setattr(harness, 'save_results', failing_save)
+
+    with pytest.raises(OSError):
+        harness.keep_entry(run, file, {'size': 64}, {'trial': 1, 'failure_reason': 'OOMKilled'})
+    assert file['trials'] == {}
 
 HEADER = {
     'environment': {'target': 'wasm'},
@@ -107,7 +176,7 @@ HEADER_MISMATCH_ROWS = {
          'trials': {}},
         ("settings:\n"
          "  file has [('cpu', '500m')]\n"
-         "  config has [('cpu', '1000m')]\n"),
+         "  config has [('cpu', '1000m')]"),
     ),
     "field only in file": (
         {'environment': {'target': 'wasm'},
@@ -115,7 +184,7 @@ HEADER_MISMATCH_ROWS = {
          'trials': {}},
         ("settings:\n"
          "  file has [('governor', 'x')]\n"
-         "  config has []\n"),
+         "  config has []"),
     ),
     "field only in config": (
         {'environment': {'target': 'wasm'},
@@ -123,7 +192,7 @@ HEADER_MISMATCH_ROWS = {
          'trials': {}},
         ("settings:\n"
          "  file has []\n"
-         "  config has [('duration', 2)]\n"),
+         "  config has [('duration', 2)]"),
     ),
     "file not a dict": (
         [1],
@@ -152,7 +221,7 @@ HEADER_MISMATCH_ROWS = {
         {'size = 256': []},
         ("environment:\n"
          "  file has []\n"
-         "  config has [('target', 'wasm')]\n"),
+         "  config has [('target', 'wasm')]"),
     ),
 }
 
@@ -308,3 +377,63 @@ def test_pending_trials(files, combinations, trials, expected):
     pending = harness.pending_trials(files, combinations, trials)
     got = [(n, file['environment']['image'], combination) for n, file, combination in pending]
     assert got == expected
+
+SAVED_TRIALS_ROWS = {
+    "another key is not this cell's": (
+        results_file('native', {'size = 512': [{'trial': 1}]}), 2,
+        {},
+    ),
+    "a number above trials is not saved": (
+        results_file('native', {'size = 64': [{'trial': 1}, {'trial': 3}]}), 2,
+        {1: {'trial': 1}},
+    ),
+    "a duplicate number counts once, the later entry wins": (
+        results_file('native', {'size = 64': [{'trial': 1, 'log': ['a']}, {'trial': 1, 'log': ['b']}]}), 2,
+        {1: {'trial': 1, 'log': ['b']}},
+    ),
+    "a failure is saved like a result": (
+        results_file('native', {'size = 64': [{'trial': 1, 'failure_reason': 'OOMKilled'}]}), 1,
+        {1: {'trial': 1, 'failure_reason': 'OOMKilled'}},
+    ),
+}
+
+@pytest.mark.parametrize("file, trials, expected",
+    SAVED_TRIALS_ROWS.values(), ids=SAVED_TRIALS_ROWS.keys(),
+)
+def test_saved_trials(file, trials, expected):
+    assert harness.saved_trials(file, {'size': 64}, trials) == expected
+
+
+DESCRIBE_REASON_ROWS = {
+    "a failure that counts as done": ('DeadlineExceeded', 'hit the time limit (DeadlineExceeded)'),
+    "a reason that reruns":          ('Completed',        'exited without a result (Completed)'),
+    "no reason, words only":         ('',                 'no reason given'),
+    "an unknown term, as is":        ('StartError',       'StartError'),
+}
+@pytest.mark.parametrize("reason, expected",
+    DESCRIBE_REASON_ROWS.values(), ids=DESCRIBE_REASON_ROWS.keys(),
+)
+def test_describe_reason(reason, expected):
+    assert harness.describe_reason(reason) == expected
+
+WINDOW = {'bench_start': 103.0, 'bench_end': 105.0}
+
+TRIAL_OUTCOME_ROWS = {
+    "a result, saved": (
+        {'result': {}, 'times': WINDOW, 'samples': [{'timestamp': 101.0}, {'timestamp': 105.1}]},
+        75.4321, 'ok           75.4 s'),
+    "a workload failure, saved as data": (
+        {'result': None, 'failure_reason': 'DeadlineExceeded'},
+        120.3, 'failed      120.3 s  hit the time limit (DeadlineExceeded), saved as data'),
+    "a reason that reruns": (
+        {'result': None, 'failure_reason': 'Completed'},
+        74.84, 'incomplete   74.8 s  exited without a result (Completed), runs again next time'),
+    "a result, but the samples missed the window": (
+        {'result': {}, 'times': WINDOW, 'samples': [{'timestamp': 104.0}]},
+        3.14159, 'incomplete    3.1 s  samples missed the measured window, runs again next time'),
+}
+@pytest.mark.parametrize("entry, seconds, expected",
+    TRIAL_OUTCOME_ROWS.values(), ids=TRIAL_OUTCOME_ROWS.keys(),
+)
+def test_trial_outcome(entry, seconds, expected):
+    assert harness.trial_outcome(entry, seconds) == expected

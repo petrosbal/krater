@@ -13,24 +13,39 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+from collections import Counter
 import itertools
 import json
 import os
+import platform
 import sys
 import threading
 from pathlib import Path
+from datetime import timedelta, datetime
+import time
 
-from config import is_number, load_config, load_environments, select_environments, validate
+from config import CONFIG_FILE, RUNNER_SLEEP, is_number, load_config, load_environments, select_environments, validate
 import cgroup
 import pod
 
-FAILURE_REASONS = ["OOMKilled", "Error", "DeadlineExceeded"]
+# workload failures, saved as data. they count as done
+DONE_REASONS = frozenset({"OOMKilled", "Error", "DeadlineExceeded"})
+
+REASON_WORDS = {
+    "OOMKilled": "ran out of memory",
+    "Error": "exited with an error",
+    "DeadlineExceeded": "hit the time limit",
+    "Completed": "exited without a result",
+    "": "no reason given"
+}
 
 MARKER_TIMES = {
     "MAIN_START": "main_start",
     "BENCH_START": "bench_start",
     "BENCH_END": "bench_end"
 }
+
+SETTINGS = ("duration", "warmup", "timeout", "cpu", "memory", "interval")
 
 # cartesian product. takes {'size': [5, 10], 'mode': ['a', 'b']} and returns
 #       1. {'size': 5,  'mode': 'a'}
@@ -56,7 +71,7 @@ def results_path(name: str, environment: dict) -> Path:
 
 def results_header(run: dict, environment: dict) -> dict:
     return {"environment": environment, 
-            "settings": {key: run[key] for key in ["duration", "warmup", "cpu", "memory", "interval"]}}
+            "settings": {key: run[key] for key in SETTINGS}}
 
 def header_mismatch(stored: dict, header: dict) -> str | None:
     if not isinstance(stored, dict):
@@ -76,14 +91,14 @@ def header_mismatch(stored: dict, header: dict) -> str | None:
         if only_in_file or only_in_config:
             return (f"{section}:\n"
                     f"  file has {only_in_file}\n"
-                    f"  config has {only_in_config}\n")
+                    f"  config has {only_in_config}")
 
     trials = stored.get('trials')
     if not isinstance(trials, dict):
         return f"expected 'trials' section in stored file to be a dict, got {type(trials).__name__}"
 
 def trial_is_done(entry: dict) -> bool:
-    if entry.get('failure_reason') in FAILURE_REASONS:
+    if entry.get('failure_reason') in DONE_REASONS:
         return True
     if entry.get('result') is None:
         return False
@@ -111,6 +126,33 @@ def save_results(path: Path, results: dict) -> None:
     with open(tmp, "w") as f:
         json.dump(results, f, indent=2)
     os.replace(tmp, path)
+
+def file_for(run: dict, environment: dict) -> tuple[dict | None, str | None]:
+    path = results_path(run['name'], environment)
+    header = results_header(run, environment)
+    stored = load_results(path)
+
+    if stored is None:
+        return {**header, 'trials': {}}, None
+    if (msg := header_mismatch(stored, header)) is not None:
+        return None, (f"Existing results file ({path}) does not match this run:\n"
+                      f"{msg}\n"
+                      "set the config back, use a new run name, or move the file")
+    return stored, None
+
+def keep_entry(run: dict, file: dict, combination: dict, entry: dict) -> bool:
+    if not trial_is_done(entry):
+        return False
+    key = trial_key(combination)
+    entries = file['trials'].get(key, [])  + [entry]
+    path = results_path(run['name'], file['environment'])
+
+    trials = file['trials'].copy()
+    trials[key] = entries
+    save_results(path, {**file, 'trials': trials})
+
+    file['trials'] = trials
+    return True
 
 def parse_result(texts: list[str]) -> dict | None:
     for text in texts:
@@ -172,15 +214,185 @@ def run_trial(run: dict, environment: dict, combination: dict, trial_num: int) -
 
     return entry
 
-def pending_trials(files: list[dict], combinations: list[dict], trials: int) -> list[tuple[int, dict, dict]]:
+def saved_trials(file: dict, combination: dict, trial_count: int) -> dict[int, dict]:
+    entries = file['trials'].get(trial_key(combination), [])
+    return {entry['trial']: entry for entry in entries if 1 <= entry['trial'] <= trial_count}
+
+def pending_trials(files: list[dict], combinations: list[dict], trial_count: int) -> list[tuple[int, dict, dict]]:
     pending = []
-    for n in range(1, trials + 1):
+    for n in range(1, trial_count + 1):
         for file in files:
             for combination in combinations:
-                entries = file['trials'].get(trial_key(combination), [])
-                if not any(entry['trial'] == n for entry in entries):
+                if n not in saved_trials(file, combination, trial_count):
                     pending.append((n, file, combination))
     return pending
+
+def machine_description() -> str:
+    u = platform.uname()
+    try:
+        governor = Path('/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor').read_text().strip()
+    except OSError:
+        governor = "unknown"
+
+    model = "unknown"
+    try:
+        for line in Path('/proc/cpuinfo').read_text().splitlines():
+            if line.startswith('model name'):
+                model = line.split(':', 1)[1].strip()
+                break
+    except OSError:
+        pass
+
+    return (f"on {u.node}, {u.system} {u.release}\n"
+            f"  cpu: {model} ({u.machine}), cpufreq governor {governor}")
+
+def banner(run: dict, files: list[dict], combinations: list[dict], pending: list) -> str:
+    started = datetime.now().isoformat(sep=' ', timespec='seconds')
+    cells = len(files) * len(combinations)
+    total = cells * run['trials']
+    saved = total - len(pending)
+    floor = round(len(pending) * (RUNNER_SLEEP + run['warmup'] + run['duration']))
+    ceiling = len(pending) * run['timeout']
+    folder = results_path(run['name'], files[0]['environment']).parent
+    resumed = f"{saved} already saved by an earlier run, {len(pending)} to run now\n" if saved else ""
+
+    return (f"KRATER run \"{run['name']}\" ({CONFIG_FILE}), started {started}\n"
+            f"{machine_description()}\n"
+            f"{cells} combinations ({len(files)} environments x {len(combinations)} param sets), "
+            f"{run['trials']} trials each = {total} trials\n"
+            f"{resumed}"
+            f"each trial: {run['warmup']} s warmup, {run['duration']} s duration, timeout at {run['timeout']} s\n"
+            f"estimated time: {timedelta(seconds=floor)} to {timedelta(seconds=ceiling)}\n"
+            f"results: {folder}/\n"
+            "Ctrl-C stops safely at any time. Run the same command to continue.")
+
+def user_confirmation() -> bool:
+    print('continue? [y/N]', file=sys.stderr)
+    print('> ', end='', flush=True, file=sys.stderr)
+    try:
+        answer = input().strip().lower()
+    except EOFError:
+        sys.exit("\nno answer (stdin closed). to run unattended: yes | python3 src/harness.py")
+    return (answer in ['y', 'yes'])
+
+def widths(files: list[dict], combinations: list[dict]) -> tuple[int, int, int]:
+    return (max(len(f['environment']['target']) for f in files),
+            max(len(f['environment']['runtime_class']) for f in files),
+            max(len(trial_key(c)) for c in combinations))
+
+def trial_label(file: dict, combination: dict, widths: tuple[int, int, int]) -> str:
+    t_width, rc_width, k_width = widths
+    return (f"{file['environment']['target']:<{t_width}}  "
+            f"{file['environment']['runtime_class']:<{rc_width}}  "
+            f"{trial_key(combination):<{k_width}}  ")
+
+def trial_identity(k: int, total: int, label: str) -> str:
+    started_at = datetime.now().strftime('%H:%M:%S')
+    return f"  [{k:>{len(str(total))}}/{total}] {started_at}  {label}"
+
+def describe_reason(reason: str) -> str:
+    words = REASON_WORDS.get(reason)
+    if words is None:
+        return reason
+    if reason == "":
+        return words
+    return f"{words} ({reason})"
+
+def trial_outcome(entry: dict, seconds: float) -> str:
+    if trial_is_done(entry):
+        if 'failure_reason' not in entry:
+            return outcome_line('ok', seconds)
+        return outcome_line('failed', seconds, f"{describe_reason(entry['failure_reason'])}, saved as data")
+    if 'failure_reason' in entry:
+        return outcome_line('incomplete', seconds, f"{describe_reason(entry['failure_reason'])}, runs again next time")
+    return outcome_line('incomplete', seconds, "samples missed the measured window, runs again next time")
+
+def round_line(n: int, trial_count: int, k: int, total: int, elapsed: float) -> str:
+    now = datetime.now().isoformat(sep=' ', timespec='seconds')
+    done = k - 1
+    if done == 0:
+        return f"round {n} of {trial_count}, {now}"
+    else:
+        left = timedelta(seconds=round(elapsed / done * (total - done)))
+        return f"round {n} of {trial_count}, {now} ({timedelta(seconds=round(elapsed))} so far, about {left} left)"
+
+def summary_table(files: list[dict], combinations: list[dict], trial_count: int) -> str:
+    col_widths = widths(files, combinations)
+    rows = []
+    for file in files:
+        for combination in combinations:
+            entries = saved_trials(file, combination, trial_count).values()
+            failure_words = []
+            for e in entries:
+                if 'failure_reason' in e:
+                    reason = e['failure_reason']
+                    failure_words.append(REASON_WORDS.get(reason, reason))
+            counts = Counter(failure_words)
+            failed = ', '.join(f"{count} {words}" for words, count in counts.items())
+
+            saved = f"{len(entries):>{len(str(trial_count))}}/{trial_count} saved"
+            of_which = f", of which {failed}" if failed else ""
+            rows.append(f"  {trial_label(file, combination, col_widths)}{saved}{of_which}")
+    return '\n'.join(rows)
+
+def closing_block(run: dict, files: list[dict], combinations: list[dict], to_rerun: list[str],
+                  elapsed: float, word: str) -> str:
+    now = datetime.now().isoformat(sep=' ', timespec='seconds')
+    total = len(files) * len(combinations) * run['trials']
+    entries = []
+    for file in files:
+        for combination in combinations:
+            entries.extend(saved_trials(file, combination, run['trials']).values())
+    failed = sum(1 for e in entries if 'failure_reason' in e)
+    left = len(pending_trials(files, combinations, run['trials']))
+
+    still_to_run = f", {left} still to run" if left else ""
+    incomplete = "incomplete this session:\n" + "\n".join(to_rerun) + "\n" if to_rerun else ""
+
+    return (f"{word} {now} after {timedelta(seconds=round(elapsed))}\n"
+            f"{len(entries)} of {total} trials saved "
+            f"({len(entries) - failed} ok, {failed} failed and saved as data){still_to_run}\n"
+            f"{incomplete}"
+            f"\n{summary_table(files, combinations, run['trials'])}")
+
+def run_rounds(run: dict, files: list[dict], combinations: list[dict], pending: list,
+               to_rerun: list[str], loop_started: float) -> None:
+    current_round = 0
+    col_widths = widths(files, combinations)
+    for k, (n, file, combination) in enumerate(pending, 1):
+        if n != current_round:
+            print(round_line(n, run['trials'], k, len(pending), time.time() - loop_started))
+            current_round = n
+
+        label = trial_label(file, combination, col_widths)
+        line = trial_identity(k, len(pending), label)
+        print(line, end='', flush=True)
+
+        started = time.time()
+
+        try:
+            entry = run_trial(run, file['environment'], combination, n)
+        # kubectl(), find_cgroup() and stream_logs() throw Runtime
+        # a cgroup file that vanished or kubectl missing would be OS
+        # and a bad log timestamp would be Value
+        except (RuntimeError, OSError, ValueError) as e:
+            error_text = str(e).split('\n')[0] or type(e).__name__
+            outcome = outcome_line('incomplete', time.time() - started, f"{error_text}, runs again next time")
+            print(outcome)
+            to_rerun.append(line + outcome)
+            continue
+
+        done = keep_entry(run, file, combination, entry)
+
+        outcome = trial_outcome(entry, time.time() - started)
+        print(outcome)
+
+        if not done:
+            to_rerun.append(line + outcome)
+
+def outcome_line(word: str, seconds: float, detail: str = '') -> str:
+    detail_text = f"  {detail}" if detail else ""
+    return f"{word:<10}  {seconds:5.1f} s{detail_text}"
 
 def main() -> None:
     config = load_config()
@@ -193,6 +405,14 @@ def main() -> None:
     run = config['run']
     selected_envs = select_environments(environments, run['runtimes'])
     combinations = param_combinations(run['params'])
+
+    files = []
+    for environment in selected_envs:
+        file, problem = file_for(run, environment) 
+        if problem is not None:
+            sys.exit(problem)
+        files.append(file)
+
     manifest = pod.manifest(selected_envs[0], 
                             trial_env(combinations[0], run['duration'], run['warmup']), 
                             run)
@@ -200,8 +420,31 @@ def main() -> None:
     try:
         pod.dry_run(manifest)
     except RuntimeError as e:
-        sys.exit(f"Dry run failed with cpu = {run['cpu']}, memory = {run['memory']} in namespace {run['namespace']}\n"
+        sys.exit(f"Dry run failed with cpu = {run['cpu']}, memory = {run['memory']} in namespace '{run['namespace']}'\n"
                  f"kubernetes failed with error: {e}")
 
+    pending = pending_trials(files, combinations, run['trials'])
+    if pending:
+        print(banner(run, files, combinations, pending))
+        if not user_confirmation():
+            return
+
+    loop_started = time.time()
+    to_rerun = []
+    stopped = False
+    try:
+        run_rounds(run, files, combinations, pending, to_rerun, loop_started)
+    except KeyboardInterrupt:
+        print("stopped by Ctrl-C, pod deleted, no result saved")
+        stopped = True
+
+    print(closing_block(run, files, combinations, to_rerun, 
+                        time.time() - loop_started, 'stopped' if stopped else 'finished'))
+    sys.exit(130 if stopped else 2 if pending_trials(files, combinations, run['trials']) else 0)
+
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\nstopped by Ctrl-C", file=sys.stderr)
+        sys.exit(130)
