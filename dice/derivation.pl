@@ -309,18 +309,22 @@ stage_inputs(Toolchain, Inputs):-
           Inputs).
 
 % ==============================================================================
-%!  stage_order(Toolchains).
-%       Succeeds when Toolchains lists every builder stage in an order where a
-%       stage appears after every stage it copies an artifact from. A build
-%       graph with a cycle has no such order and no answer here.
-stage_order(Toolchains):-
+%!  stage_order(Stages).
+%       Succeeds when Stages lists every builder stage in an order where a
+%       stage appears after every stage it copies an artifact from, and every
+%       final stage afterwards. A build graph with a cycle has no such order and
+%       no answer here.
+stage_order(Stages):-
     findall(Toolchain, stage_steps(Toolchain, _), Vertices),
     findall(Producer-Consumer,
             ( stage_inputs(Consumer, Inputs),
               member(artifact(Producer, _), Inputs) ),
             Edges),
     vertices_edges_to_ugraph(Vertices, Edges, Graph),
-    top_sort(Graph, Toolchains).
+    top_sort(Graph, Toolchains),
+    findall(builder(Toolchain), member(Toolchain, Toolchains), BuildStages),
+    findall(final(Target), target(Target), FinalStages),
+    append([BuildStages, FinalStages], Stages).
 
 % ==============================================================================
 %!  target_shipped_filename(Target, Filename).

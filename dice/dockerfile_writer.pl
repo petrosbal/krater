@@ -6,7 +6,6 @@
 :- module(dockerfile_writer, [write_dockerfile/1]).
 :- use_module(library(lists), [member/2]).
 :- use_module(derivation).
-:- use_module(build_facts).
 
 % ==============================================================================
 %!  build_directory(Directory).
@@ -46,10 +45,12 @@ render_builder_stage_step(OutStream, Step):-
     format(OutStream, 'RUN ~w~n', [Command]).
 
 % ==============================================================================
-%!  render_builder_stage(OutStream, Toolchain).
-%       Renders one builder stage, from the FROM line through its setup and
-%       inputs to one RUN for each step it owns.
-render_builder_stage(OutStream, Toolchain):-
+%!  render_stage(OutStream, Stage).
+%       Renders a single stage. If it's a builder stage, it's rendered from the
+%       FROM line through its setup and inputs to one RUN for each step it owns.
+%       If it's a final image, it sits on a base, copies the one artifact from
+%       a builder stage, and sets the command that runs it.
+render_stage(OutStream, builder(Toolchain)):-
     nl(OutStream),
     builder_image(Toolchain, Image),
     stage_name(builder(Toolchain), Name),
@@ -66,11 +67,7 @@ render_builder_stage(OutStream, Toolchain):-
     forall(member(Step, Steps),
            render_builder_stage_step(OutStream, Step)).
 
-% ==============================================================================
-%!  render_final_image(OutStream, Target).
-%       Renders one target's final image. It sits on a base, copies the one
-%       artifact from a builder stage, and sets the command that runs it.
-render_final_image(OutStream, Target):-
+render_stage(OutStream, final(Target)):-
     nl(OutStream),
     target_base_image(Target, BaseImage),
     stage_name(final(Target), StageName),
@@ -96,16 +93,14 @@ render_header(OutStream):-
 % ==============================================================================
 %!  render_dockerfile(OutStream).
 %       Renders the whole Dockerfile to OutStream, starting with the header,
-%       then one block per toolchain, then one block per target.
+%       then one block per stage (either builder or final).
 render_dockerfile(OutStream):-
     not(duplicate_targets(_, _)),
     not(stage_name_collision(_)),
     render_header(OutStream),
-    stage_order(Toolchains),
-    forall(member(Toolchain, Toolchains),
-           render_builder_stage(OutStream, Toolchain)),
-    forall(target(Target),
-           render_final_image(OutStream, Target)).
+    stage_order(Stages),
+    forall(member(Stage, Stages),
+           render_stage(OutStream, Stage)).
 
 % ==============================================================================
 %!  write_dockerfile(Path).
