@@ -400,6 +400,13 @@ def outcome_line(word: str, seconds: float, detail: str = '') -> str:
     detail_text = f"  {detail}" if detail else ""
     return f"{word:<10}  {seconds:5.1f} s{detail_text}"
 
+def exit_code(stopped: bool, left: int) -> int:
+    if stopped:
+        return 130
+    elif left > 0:
+        return 2
+    return 0
+
 def main() -> None:
     config = load_config()
     environments = load_environments()
@@ -433,14 +440,15 @@ def main() -> None:
     if pending:
         print(banner(run, files, combinations, pending))
         if not user_confirmation():
-            return
+            sys.exit("nothing ran")
 
     loop_started = time.time()
     to_rerun, stopped = run_rounds(run, files, combinations, pending, loop_started)
 
     print(closing_block(run, files, combinations, to_rerun, 
                         time.time() - loop_started, 'stopped' if stopped else 'finished'))
-    sys.exit(130 if stopped else 2 if pending_trials(files, combinations, run['trials']) else 0)
+    left = len(pending_trials(files, combinations, run['trials']))
+    sys.exit(exit_code(stopped, left))
 
 if __name__ == "__main__":
     try:
