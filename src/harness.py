@@ -164,9 +164,12 @@ def parse_result(texts: list[str]) -> dict | None:
                 return None
     return None
 
-def run_trial(run: dict, environment: dict, combination: dict, trial_num: int) -> dict:
+def trial_manifest(run: dict, environment: dict, combination: dict) -> dict:
     trial_vars = trial_env(combination, run['duration'], run['warmup'])
-    manifest = pod.manifest(environment, trial_vars, run)
+    return pod.manifest(environment, trial_vars, run)
+
+def run_trial(run: dict, environment: dict, combination: dict, trial_num: int) -> dict:
+    manifest = trial_manifest(run, environment, combination)
     stop = threading.Event()
     samples = []
     monitor = None
@@ -426,12 +429,8 @@ def main() -> None:
             sys.exit(problem)
         files.append(file)
 
-    manifest = pod.manifest(selected_envs[0], 
-                            trial_env(combinations[0], run['duration'], run['warmup']), 
-                            run)
-
     try:
-        pod.dry_run(manifest)
+        pod.dry_run(trial_manifest(run, selected_envs[0], combinations[0]))
     except RuntimeError as e:
         sys.exit(f"Dry run failed with cpu = {run['cpu']}, memory = {run['memory']} in namespace '{run['namespace']}'\n"
                  f"kubernetes failed with error: {e}")
