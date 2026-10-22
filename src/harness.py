@@ -230,27 +230,9 @@ def pending_trials(files: list[dict], combinations: list[dict], trial_count: int
                     pending.append((n, file, combination))
     return pending
 
-def machine_description() -> str:
-    u = platform.uname()
-    try:
-        governor = Path('/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor').read_text().strip()
-    except OSError:
-        governor = "unknown"
-
-    model = "unknown"
-    try:
-        for line in Path('/proc/cpuinfo').read_text().splitlines():
-            if line.startswith('model name'):
-                model = line.split(':', 1)[1].strip()
-                break
-    except OSError:
-        pass
-
-    return (f"on {u.node}, {u.system} {u.release}\n"
-            f"  cpu: {model} ({u.machine}), cpufreq governor {governor}")
-
 def banner(run: dict, files: list[dict], combinations: list[dict], pending: list) -> str:
     started = datetime.now().isoformat(sep=' ', timespec='seconds')
+    u = platform.uname()
     cells = len(files) * len(combinations)
     total = cells * run['trials']
     saved = total - len(pending)
@@ -260,7 +242,8 @@ def banner(run: dict, files: list[dict], combinations: list[dict], pending: list
     resumed = f"{saved} already saved by an earlier run, {len(pending)} to run now\n" if saved else ""
 
     return (f"KRATER run \"{run['name']}\" ({CONFIG_FILE}), started {started}\n"
-            f"{machine_description()}\n"
+            f"on {u.node}, {u.system} {u.release}\n"
+            f"  cpu: {cgroup.cpu_model()} ({u.machine}), cpufreq governor {cgroup.cpu_governor()}\n"
             f"{cells} combinations ({len(files)} environments x {len(combinations)} param sets), "
             f"{run['trials']} trials each = {total} trials\n"
             f"{resumed}"

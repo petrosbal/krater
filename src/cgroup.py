@@ -74,3 +74,18 @@ def sample_until(cgroup_path: Path, missing: set[str], interval: float, stop: th
         if sample := take_sample(cgroup_path, missing):
             samples.append(sample)
         stop.wait(interval)
+
+def cpu_governor() -> str:
+    try:
+        return Path('/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor').read_text().strip()
+    except OSError:
+        return "unknown"
+
+def cpu_model() -> str:
+    try:
+        for line in Path('/proc/cpuinfo').read_text().splitlines():
+            if line.startswith('model name'):
+                return line.split(':', 1)[1].strip()
+    except OSError:
+        pass
+    return "unknown"
