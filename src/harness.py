@@ -257,7 +257,8 @@ def boxed(title: str, lines: list[str]) -> str:
     bottom = "└" + "─" * (inner_width + 2) + "┘"
     return "\n".join([top, *middle, bottom])
 
-def banner(run: dict, files: list[dict], combinations: list[dict], pending: list) -> str:
+def banner(run: dict, files: list[dict], combinations: list[dict], pending: list,
+           governor: str, model: str) -> str:
     host = platform.uname()
     total_trials = len(files) * len(combinations) * run['trials']
     trials_saved = total_trials - len(pending)
@@ -267,8 +268,8 @@ def banner(run: dict, files: list[dict], combinations: list[dict], pending: list
 
     rows = [("started", current_datetime()),
             ("host", f"{host.node}, {host.system} {host.release}"),
-            ("cpu", f"{cgroup.cpu_model()} ({host.machine})"),
-            ("governor", cgroup.cpu_governor()),
+            ("cpu", f"{model} ({host.machine})"),
+            ("governor", governor),
             None,
             ("trials", f"{len(files)} environments x {len(combinations)} param combinations "
                        f"x {run['trials']} = {total_trials}")]
@@ -472,7 +473,7 @@ def main() -> None:
 
     pending = pending_trials(files, combinations, run['trials'])
     if pending:
-        print(banner(run, files, combinations, pending), flush=True)
+        print(banner(run, files, combinations, pending, cgroup.cpu_governor(), cgroup.cpu_model()), flush=True)
         if not user_confirmation():
             sys.exit("nothing ran")
     else:
