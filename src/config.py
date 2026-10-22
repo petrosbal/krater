@@ -19,6 +19,8 @@ import re
 CONFIG_FILE = 'krater.yaml'
 ENVIRONMENTS_FILE = "dice/generated/available_environments.yaml"
 RUNNER_SLEEP = 2 # the first sleep from workload_runner.h
+RUNNER_TAIL_SLEEP = 2 # the last sleep from workload_runner.h
+                      # it keeps the container's cgroup alive for the end sample (after BENCH_END)
 RUN_KEYS = frozenset({
     "name",
     "params",

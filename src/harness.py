@@ -24,7 +24,16 @@ from pathlib import Path
 from datetime import timedelta, datetime
 import time
 
-from config import CONFIG_FILE, RUNNER_SLEEP, is_number, load_config, load_environments, select_environments, validate
+from config import (
+    CONFIG_FILE,
+    RUNNER_SLEEP,
+    RUNNER_TAIL_SLEEP,
+    is_number,
+    load_config,
+    load_environments,
+    select_environments,
+    validate,
+)
 import cgroup
 import pod
 
@@ -236,7 +245,7 @@ def banner(run: dict, files: list[dict], combinations: list[dict], pending: list
     cells = len(files) * len(combinations)
     total = cells * run['trials']
     saved = total - len(pending)
-    floor = round(len(pending) * (RUNNER_SLEEP + run['warmup'] + run['duration']))
+    floor = round(len(pending) * (RUNNER_SLEEP + run['warmup'] + run['duration'] + RUNNER_TAIL_SLEEP))
     ceiling = len(pending) * run['timeout']
     folder = results_path(run['name'], files[0]['environment']).parent
     resumed = f"{saved} already saved by an earlier run, {len(pending)} to run now\n" if saved else ""
