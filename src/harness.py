@@ -54,6 +54,8 @@ MARKER_TIMES = {
     "BENCH_END": "bench_end"
 }
 
+BENCH_RESULT_PREFIX = "BENCH_RESULT "
+
 SETTINGS = ("duration", "warmup", "timeout", "cpu", "memory", "interval")
 
 # cartesian product. takes {'size': [5, 10], 'mode': ['a', 'b']} and returns
@@ -165,9 +167,9 @@ def keep_entry(run: dict, file: dict, combination: dict, entry: dict) -> bool:
 
 def parse_result(texts: list[str]) -> dict | None:
     for text in texts:
-        if text.startswith(prefix := "BENCH_RESULT "):
+        if text.startswith(BENCH_RESULT_PREFIX):
             try:
-                result = json.loads(text.removeprefix(prefix))
+                result = json.loads(text.removeprefix(BENCH_RESULT_PREFIX))
                 return result if isinstance(result, dict) else None
             except json.JSONDecodeError:
                 return None
@@ -181,11 +183,12 @@ def run_trial(run: dict, environment: dict, combination: dict, trial_num: int) -
     manifest = trial_manifest(run, environment, combination)
     stop = threading.Event()
     samples = []
+    times = {}
     monitor = None
     failure_reason = None
 
     try:
-        times = {"applied": pod.start(manifest)}
+        times["applied"] = pod.start(manifest)
         container_id = pod.container_id(run['namespace'], run['timeout'])
         cgroup_path = cgroup.find_cgroup(container_id)
         missing = cgroup.missing_fields(cgroup_path)
@@ -241,13 +244,19 @@ def pending_trials(files: list[dict], combinations: list[dict], trial_count: int
                     pending.append((n, file, combination))
     return pending
 
+def current_datetime() -> str:
+    return datetime.now().isoformat(sep=' ', timespec='seconds')
+
+def rounded_duration(seconds: float) -> timedelta:
+    return timedelta(seconds=round(seconds))
+
 def banner(run: dict, files: list[dict], combinations: list[dict], pending: list) -> str:
-    started = datetime.now().isoformat(sep=' ', timespec='seconds')
+    started = current_datetime()
     u = platform.uname()
     cells = len(files) * len(combinations)
     total = cells * run['trials']
     saved = total - len(pending)
-    floor = round(len(pending) * (RUNNER_SLEEP + run['warmup'] + run['duration'] + RUNNER_TAIL_SLEEP))
+    floor = len(pending) * (RUNNER_SLEEP + run['warmup'] + run['duration'] + RUNNER_TAIL_SLEEP)
     ceiling = len(pending) * run['timeout']
     folder = results_path(run['name'], files[0]['environment']).parent
     resumed = f"{saved} already saved by an earlier run, {len(pending)} to run now\n" if saved else ""
@@ -259,18 +268,17 @@ def banner(run: dict, files: list[dict], combinations: list[dict], pending: list
             f"{run['trials']} trials each = {total} trials\n"
             f"{resumed}"
             f"each trial: {run['warmup']} s warmup, {run['duration']} s duration, timeout at {run['timeout']} s\n"
-            f"estimated time: {timedelta(seconds=floor)} to {timedelta(seconds=ceiling)}\n"
+            f"estimated time: {rounded_duration(floor)} to {rounded_duration(ceiling)}\n"
             f"results: {folder}/\n"
             "Ctrl-C stops safely at any time. Run the same command to continue.")
 
 def user_confirmation() -> bool:
-    print('continue? [y/N]', file=sys.stderr)
-    print('> ', end='', flush=True, file=sys.stderr)
+    print('continue? [y/N]\n> ', end='', flush=True, file=sys.stderr)
     try:
         answer = input().strip().lower()
     except EOFError:
         sys.exit("\nno answer (stdin closed). to run unattended: yes | python3 src/harness.py")
-    return (answer in ['y', 'yes'])
+    return answer in ['y', 'yes']
 
 def widths(files: list[dict], combinations: list[dict]) -> tuple[int, int, int]:
     return (max(len(f['environment']['target']) for f in files),
@@ -305,13 +313,12 @@ def trial_outcome(entry: dict, seconds: float) -> str:
     return outcome_line('incomplete', seconds, "samples missed the measured window, runs again next time")
 
 def round_line(n: int, trial_count: int, k: int, total: int, elapsed: float) -> str:
-    now = datetime.now().isoformat(sep=' ', timespec='seconds')
+    now = current_datetime()
     done = k - 1
     if done == 0:
         return f"round {n} of {trial_count}, {now}"
-    else:
-        left = timedelta(seconds=round(elapsed / done * (total - done)))
-        return f"round {n} of {trial_count}, {now} ({timedelta(seconds=round(elapsed))} so far, about {left} left)"
+    left = rounded_duration(elapsed / done * (total - done))
+    return f"round {n} of {trial_count}, {now} ({rounded_duration(elapsed)} so far, about {left} left)"
 
 def summary_table(files: list[dict], combinations: list[dict], trial_count: int) -> str:
     col_widths = widths(files, combinations)
@@ -334,7 +341,7 @@ def summary_table(files: list[dict], combinations: list[dict], trial_count: int)
 
 def closing_block(run: dict, files: list[dict], combinations: list[dict], to_rerun: list[str],
                   elapsed: float, word: str) -> str:
-    now = datetime.now().isoformat(sep=' ', timespec='seconds')
+    now = current_datetime()
     total = len(files) * len(combinations) * run['trials']
     entries = []
     for file in files:
@@ -350,7 +357,7 @@ def closing_block(run: dict, files: list[dict], combinations: list[dict], to_rer
             f"({len(entries) - failed} ok, {failed} failed and saved as data){still_to_run}\n"
             f"{incomplete}"
             f"\n{summary_table(files, combinations, run['trials'])}\n"
-            f"\n{word} {now} after {timedelta(seconds=round(elapsed))}")
+            f"\n{word} {now} after {rounded_duration(elapsed)}")
 
 def run_rounds(run: dict, files: list[dict], combinations: list[dict], pending: list,
                loop_started: float) -> tuple[list[str], bool]:
