@@ -26,17 +26,7 @@ from config import (
 import cgroup
 import pod
 import results
-from console import (
-    banner,
-    closing_block,
-    dry_run_refusal_text,
-    outcome_line,
-    round_line,
-    trial_identity,
-    trial_label,
-    trial_outcome,
-    widths,
-)
+import console
 import trial
 
 # cartesian product. takes {'size': [5, 10], 'mode': ['a', 'b']} and returns
@@ -60,32 +50,32 @@ def run_rounds(run: dict, files: list[dict], combinations: list[dict], pending: 
                loop_started: float) -> tuple[list[str], bool]:
     current_round = 0
     to_rerun = []
-    col_widths = widths(files, combinations)
+    col_widths = console.widths(files, combinations)
     try:
         for k, (n, file, combination) in enumerate(pending, 1):
             if n != current_round:
-                print(round_line(n, run['trials'], k, len(pending), time.time() - loop_started))
+                print(console.round_line(n, run['trials'], k, len(pending), time.time() - loop_started))
                 current_round = n
 
-            label = trial_label(file, combination, col_widths)
-            line = trial_identity(k, len(pending), label)
+            label = console.trial_label(file, combination, col_widths)
+            line = console.trial_identity(k, len(pending), label)
             print(line, end='', flush=True)
 
             trial_start = time.time()
             try:
-                entry = trial.run(run, file['environment'], combination, n)
+                entry = trial.conduct(run, file['environment'], combination, n)
             # kubectl(), find_cgroup() and stream_logs() throw Runtime
             # a cgroup file that vanished or kubectl missing would be OS
             # and a bad log timestamp would be Value
             except (RuntimeError, OSError, ValueError) as e:
                 error_text = str(e).split('\n')[0] or type(e).__name__
-                outcome = outcome_line('incomplete', time.time() - trial_start, f"{error_text}, runs again next time")
+                outcome = console.outcome_line('incomplete', time.time() - trial_start, f"{error_text}, runs again next time")
                 print(outcome)
                 to_rerun.append(line + outcome)
                 continue
 
             was_kept = results.keep_entry(run, file, combination, entry)
-            outcome = trial_outcome(entry, time.time() - trial_start)
+            outcome = console.trial_outcome(entry, time.time() - trial_start)
             print(outcome)
 
             if not was_kept:
@@ -139,11 +129,11 @@ def main() -> None:
         try:
             pod.dry_run(trial.manifest(run, env, combinations[0]))
         except RuntimeError as e:
-            sys.exit(dry_run_refusal_text(run, env, e))
+            sys.exit(console.dry_run_refusal_text(run, env, e))
 
     pending = results.pending_trials(files, combinations, run['trials'])
     if pending:
-        print(banner(run, files, combinations, pending, cgroup.cpu_governor(), cgroup.cpu_model()), flush=True)
+        print(console.banner(run, files, combinations, pending, cgroup.cpu_governor(), cgroup.cpu_model()), flush=True)
         if not user_confirmation():
             sys.exit("nothing ran")
     else:
@@ -152,7 +142,7 @@ def main() -> None:
     loop_started = time.time()
     to_rerun, was_stopped = run_rounds(run, files, combinations, pending, loop_started)
 
-    print(closing_block(run, files, combinations, to_rerun, 
+    print(console.closing_block(run, files, combinations, to_rerun, 
                         time.time() - loop_started, 'stopped' if was_stopped else 'finished'))
     trials_left = len(results.pending_trials(files, combinations, run['trials']))
     sys.exit(exit_code(was_stopped, trials_left))

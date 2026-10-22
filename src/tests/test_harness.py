@@ -16,7 +16,7 @@ def test_combinations_without_params():
 def test_run_rounds_stops_properly(monkeypatch, capsys):
     def keyboard_interrupt(run, environment, combination, trial_num):
         raise KeyboardInterrupt
-    monkeypatch.setattr(trial, 'run', keyboard_interrupt)
+    monkeypatch.setattr(trial, 'conduct', keyboard_interrupt)
 
     run = {'trials': 1}
     files = [{'environment': {'target': 'wasm', 'runtime_class': 'wasmtime'}}]

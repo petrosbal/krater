@@ -47,7 +47,7 @@ def manifest(run: dict, environment: dict, combination: dict) -> dict:
     trial_vars = env(combination, run['duration'], run['warmup'])
     return pod.manifest(environment, trial_vars, run)
 
-def run(run: dict, environment: dict, combination: dict, trial_num: int) -> dict:
+def conduct(run: dict, environment: dict, combination: dict, trial_num: int) -> dict:
     pod_manifest = manifest(run, environment, combination)
     stop = threading.Event()
     samples = []

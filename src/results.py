@@ -91,16 +91,16 @@ def save(path: Path, results: dict) -> None:
 
 def file_for(run: dict, environment: dict) -> tuple[dict | None, str | None]:
     file_path = path(run['name'], environment)
-    run_header = header(run, environment)
-    stored = load(file_path)
+    expected_header = header(run, environment)
+    stored_file = load(file_path)
 
-    if stored is None:
-        return {**run_header, 'trials': {}}, None
-    if (mismatch := header_mismatch(stored, run_header)) is not None:
+    if stored_file is None:
+        return {**expected_header, 'trials': {}}, None
+    if (mismatch := header_mismatch(stored_file, expected_header)) is not None:
         return None, (f"existing results file ({file_path}) does not match this run:\n"
                       f"{mismatch}\n"
                       "set the config back, use a new run name, or move the file")
-    return stored, None
+    return stored_file, None
 
 def keep_entry(run: dict, file: dict, combination: dict, entry: dict) -> bool:
     if not trial_is_done(entry):
