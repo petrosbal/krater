@@ -16,11 +16,9 @@
 from collections import Counter
 import itertools
 import json
-import os
 import platform
 import sys
 import threading
-from pathlib import Path
 from datetime import timedelta, datetime
 import time
 
@@ -28,7 +26,6 @@ from config import (
     CONFIG_FILE,
     RUNNER_SLEEP,
     RUNNER_TAIL_SLEEP,
-    is_number,
     load_config,
     load_environments,
     select_environments,
@@ -36,9 +33,15 @@ from config import (
 )
 import cgroup
 import pod
-
-# workload failures, saved as data. they count as done
-DONE_REASONS = frozenset({"OOMKilled", "Error", "DeadlineExceeded"})
+from results import (
+    file_for,
+    keep_entry,
+    pending_trials,
+    results_path,
+    saved_trials,
+    trial_is_done,
+    trial_key,
+)
 
 REASON_WORDS = {
     "OOMKilled": "ran out of memory",
@@ -56,8 +59,6 @@ MARKER_TIMES = {
 
 BENCH_RESULT_PREFIX = "BENCH_RESULT "
 
-SETTINGS = ("duration", "warmup", "timeout", "cpu", "memory", "interval")
-
 # cartesian product. takes {'size': [5, 10], 'mode': ['a', 'b']} and returns
 #       1. {'size': 5,  'mode': 'a'}
 #       2. {'size': 5,  'mode': 'b'}
@@ -72,98 +73,6 @@ def trial_env(combination: dict, duration, warmup) -> dict:
     env['KRATER_DURATION'] = str(float(duration))
     env['KRATER_WARMUP'] = str(float(warmup))
     return env
-
-def trial_key(combination: dict) -> str:
-    return ', '.join(f"{k} = {v}" for k,v in sorted(combination.items()))
-
-def results_path(name: str, environment: dict) -> Path:
-    safe_image_name = environment['image'].replace(':', '_').replace('/', '_')
-    return Path("results") / name / f"{safe_image_name}_{environment['runtime_class']}.json"
-
-def results_header(run: dict, environment: dict) -> dict:
-    return {"environment": environment, 
-            "settings": {key: run[key] for key in SETTINGS}}
-
-def header_mismatch(stored: dict, header: dict) -> str | None:
-    if not isinstance(stored, dict):
-        return f"expected stored file to be a dict, got {type(stored).__name__}"
-
-    for section in header:
-        stored_section = stored.get(section, {})
-        if not isinstance(stored_section, dict):
-            return f"stored section {section!r} is not a dict"
-
-        for key, value in stored_section.items():
-            if not is_number(value) and not isinstance(value, str):
-                return f"value of key {key!r} in section {section!r} ({value!r}) is not a number or string"
-
-        only_in_file = sorted(stored_section.items() - header[section].items())
-        only_in_config = sorted(header[section].items() - stored_section.items())
-        if only_in_file or only_in_config:
-            return (f"{section}:\n"
-                    f"  file has {only_in_file}\n"
-                    f"  config has {only_in_config}")
-
-    trials = stored.get('trials')
-    if not isinstance(trials, dict):
-        return f"expected 'trials' section in stored file to be a dict, got {type(trials).__name__}"
-
-def trial_is_done(entry: dict) -> bool:
-    if entry.get('failure_reason') in DONE_REASONS:
-        return True
-    if entry.get('result') is None:
-        return False
-    times = entry.get('times', {})
-    start = times.get('bench_start')
-    end = times.get('bench_end')
-    if start is None or end is None:
-        return False
-
-    timestamps = [sample['timestamp'] for sample in entry.get('samples', [])]
-    if timestamps == []:
-        return False
-    return min(timestamps) <= start and max(timestamps) >= end
-
-def load_results(path: Path) -> dict | None:
-    if not path.exists():
-        return None
-    with open(path, "r") as f:
-        return json.load(f)
-
-def save_results(path: Path, results: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
-
-    with open(tmp, "w") as f:
-        json.dump(results, f, indent=2)
-    os.replace(tmp, path)
-
-def file_for(run: dict, environment: dict) -> tuple[dict | None, str | None]:
-    path = results_path(run['name'], environment)
-    header = results_header(run, environment)
-    stored = load_results(path)
-
-    if stored is None:
-        return {**header, 'trials': {}}, None
-    if (mismatch := header_mismatch(stored, header)) is not None:
-        return None, (f"existing results file ({path}) does not match this run:\n"
-                      f"{mismatch}\n"
-                      "set the config back, use a new run name, or move the file")
-    return stored, None
-
-def keep_entry(run: dict, file: dict, combination: dict, entry: dict) -> bool:
-    if not trial_is_done(entry):
-        return False
-    key = trial_key(combination)
-    entries = file['trials'].get(key, [])  + [entry]
-    path = results_path(run['name'], file['environment'])
-
-    trials = file['trials'].copy()
-    trials[key] = entries
-    save_results(path, {**file, 'trials': trials})
-
-    file['trials'] = trials
-    return True
 
 def parse_result(texts: list[str]) -> dict | None:
     for text in texts:
@@ -230,19 +139,6 @@ def run_trial(run: dict, environment: dict, combination: dict, trial_num: int) -
         entry['failure_reason'] = failure_reason
 
     return entry
-
-def saved_trials(file: dict, combination: dict, trial_count: int) -> dict[int, dict]:
-    entries = file['trials'].get(trial_key(combination), [])
-    return {entry['trial']: entry for entry in entries if 1 <= entry['trial'] <= trial_count}
-
-def pending_trials(files: list[dict], combinations: list[dict], trial_count: int) -> list[tuple[int, dict, dict]]:
-    pending = []
-    for n in range(1, trial_count + 1):
-        for file in files:
-            for combination in combinations:
-                if n not in saved_trials(file, combination, trial_count):
-                    pending.append((n, file, combination))
-    return pending
 
 def current_datetime() -> str:
     return datetime.now().isoformat(sep=' ', timespec='seconds')
