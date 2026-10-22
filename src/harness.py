@@ -33,15 +33,7 @@ from config import (
 )
 import cgroup
 import pod
-from results import (
-    file_for,
-    keep_entry,
-    pending_trials,
-    results_path,
-    saved_trials,
-    trial_is_done,
-    trial_key,
-)
+import results
 
 REASON_WORDS = {
     "OOMKilled": "ran out of memory",
@@ -160,7 +152,7 @@ def banner(run: dict, files: list[dict], combinations: list[dict], pending: list
     trials_saved = total_trials - len(pending)
     floor = len(pending) * (RUNNER_SLEEP + run['warmup'] + run['duration'] + RUNNER_TAIL_SLEEP)
     ceiling = len(pending) * run['timeout']
-    folder = results_path(run['name'], files[0]['environment']).parent
+    folder = results.path(run['name'], files[0]['environment']).parent
 
     rows = [("started", current_datetime()),
             ("host", f"{host.node}, {host.system} {host.release}"),
@@ -193,13 +185,13 @@ def user_confirmation() -> bool:
 def widths(files: list[dict], combinations: list[dict]) -> tuple[int, int, int]:
     return (max(len(f['environment']['target']) for f in files),
             max(len(f['environment']['runtime_class']) for f in files),
-            max(len(trial_key(c)) for c in combinations))
+            max(len(results.trial_key(c)) for c in combinations))
 
 def trial_label(file: dict, combination: dict, widths: tuple[int, int, int]) -> str:
     t_width, rc_width, k_width = widths
     return (f"{file['environment']['target']:<{t_width}}  "
             f"{file['environment']['runtime_class']:<{rc_width}}  "
-            f"{trial_key(combination):<{k_width}}  ")
+            f"{results.trial_key(combination):<{k_width}}  ")
 
 def trial_identity(k: int, total_session_trials: int, label: str) -> str:
     started_at = datetime.now().strftime('%H:%M:%S')
@@ -214,7 +206,7 @@ def describe_reason(reason: str) -> str:
     return f"{words} ({reason})"
 
 def trial_outcome(entry: dict, seconds: float) -> str:
-    if trial_is_done(entry):
+    if results.trial_is_done(entry):
         if 'failure_reason' not in entry:
             return outcome_line('ok', seconds)
         return outcome_line('failed', seconds, f"{describe_reason(entry['failure_reason'])}, saved as data")
@@ -235,7 +227,7 @@ def summary_table(files: list[dict], combinations: list[dict], trial_count: int)
     rows = []
     for file in files:
         for combination in combinations:
-            entries = saved_trials(file, combination, trial_count).values()
+            entries = results.saved_trials(file, combination, trial_count).values()
             failure_words = []
             for e in entries:
                 if 'failure_reason' in e:
@@ -256,9 +248,9 @@ def closing_block(run: dict, files: list[dict], combinations: list[dict], to_rer
     entries = []
     for file in files:
         for combination in combinations:
-            entries.extend(saved_trials(file, combination, run['trials']).values())
+            entries.extend(results.saved_trials(file, combination, run['trials']).values())
     trials_failed = sum(1 for e in entries if 'failure_reason' in e)
-    trials_left = len(pending_trials(files, combinations, run['trials']))
+    trials_left = len(results.pending_trials(files, combinations, run['trials']))
 
     still_to_run = f", {trials_left} still to run" if trials_left else ""
     incomplete = "incomplete this session:\n" + "\n".join(to_rerun) + "\n" if to_rerun else ""
@@ -297,7 +289,7 @@ def run_rounds(run: dict, files: list[dict], combinations: list[dict], pending: 
                 to_rerun.append(line + outcome)
                 continue
 
-            was_kept = keep_entry(run, file, combination, entry)
+            was_kept = results.keep_entry(run, file, combination, entry)
             outcome = trial_outcome(entry, time.time() - trial_start)
             print(outcome)
 
@@ -346,7 +338,7 @@ def main() -> None:
 
     files = []
     for environment in selected_envs:
-        file, problem = file_for(run, environment) 
+        file, problem = results.file_for(run, environment) 
         if problem is not None:
             sys.exit(problem)
         files.append(file)
@@ -367,7 +359,7 @@ def main() -> None:
         except RuntimeError as e:
             sys.exit(dry_run_refusal_text(run, env, e))
 
-    pending = pending_trials(files, combinations, run['trials'])
+    pending = results.pending_trials(files, combinations, run['trials'])
     if pending:
         print(banner(run, files, combinations, pending, cgroup.cpu_governor(), cgroup.cpu_model()), flush=True)
         if not user_confirmation():
@@ -380,7 +372,7 @@ def main() -> None:
 
     print(closing_block(run, files, combinations, to_rerun, 
                         time.time() - loop_started, 'stopped' if was_stopped else 'finished'))
-    trials_left = len(pending_trials(files, combinations, run['trials']))
+    trials_left = len(results.pending_trials(files, combinations, run['trials']))
     sys.exit(exit_code(was_stopped, trials_left))
 
 if __name__ == "__main__":

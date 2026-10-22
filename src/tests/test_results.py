@@ -27,7 +27,7 @@ def test_trial_key(combination, expected):
      Path('results/b/reg_krater_x_default.json')),
 ])
 def test_results_path(name, environment, expected):
-    assert results.results_path(name, environment) == expected
+    assert results.path(name, environment) == expected
 
 RESULTS_HEADER_RUN = {
     'duration': 59,
@@ -47,7 +47,7 @@ RESULTS_HEADER_ENVIRONMENT = {
 }
 
 def test_results_header():
-    assert results.results_header(RESULTS_HEADER_RUN, RESULTS_HEADER_ENVIRONMENT) == {
+    assert results.header(RESULTS_HEADER_RUN, RESULTS_HEADER_ENVIRONMENT) == {
         'environment': {
             'target': 'wasm',
             'image': 'krater:matmul_wasm',
@@ -66,7 +66,7 @@ def test_results_header():
 def test_file_for_without_a_file(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     file, problem = results.file_for({**RESULTS_HEADER_RUN, 'name': 'b'}, RESULTS_HEADER_ENVIRONMENT)
-    expected = {**results.results_header(RESULTS_HEADER_RUN, RESULTS_HEADER_ENVIRONMENT),
+    expected = {**results.header(RESULTS_HEADER_RUN, RESULTS_HEADER_ENVIRONMENT),
                 'trials': {}}
 
     assert file == expected
@@ -74,9 +74,9 @@ def test_file_for_without_a_file(tmp_path, monkeypatch):
 
 def test_file_for_reopens_a_saved_file(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    saved = {**results.results_header(RESULTS_HEADER_RUN, RESULTS_HEADER_ENVIRONMENT),
+    saved = {**results.header(RESULTS_HEADER_RUN, RESULTS_HEADER_ENVIRONMENT),
              'trials': {'size = 64': [{'trial': 1}]}}
-    results.save_results(results.results_path('b', RESULTS_HEADER_ENVIRONMENT), saved)
+    results.save(results.path('b', RESULTS_HEADER_ENVIRONMENT), saved)
     file, problem = results.file_for({**RESULTS_HEADER_RUN, 'name': 'b'}, RESULTS_HEADER_ENVIRONMENT)
 
     assert file == saved
@@ -84,9 +84,9 @@ def test_file_for_reopens_a_saved_file(tmp_path, monkeypatch):
 
 def test_file_for_refuses_a_changed_setting(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    saved = {**results.results_header(RESULTS_HEADER_RUN, RESULTS_HEADER_ENVIRONMENT),
+    saved = {**results.header(RESULTS_HEADER_RUN, RESULTS_HEADER_ENVIRONMENT),
              'trials': {}}
-    results.save_results(results.results_path('b', RESULTS_HEADER_ENVIRONMENT), saved)
+    results.save(results.path('b', RESULTS_HEADER_ENVIRONMENT), saved)
     file, problem = results.file_for({**RESULTS_HEADER_RUN, 'name': 'b', 'cpu': '500m'},
                                      RESULTS_HEADER_ENVIRONMENT)
 
@@ -118,7 +118,7 @@ def test_keep_entry_drops_an_entry_that_is_not_done(tmp_path, monkeypatch):
 
     assert done is False
     assert file['trials'] == {}
-    assert not results.results_path('b', RESULTS_HEADER_ENVIRONMENT).exists()
+    assert not results.path('b', RESULTS_HEADER_ENVIRONMENT).exists()
 
 # keep_entry saves before it touches file, so a failed save can't leave
 # an entry in memory that the disk doesn't have
@@ -130,7 +130,7 @@ def test_keep_entry_failed_save_leaves_file_unchanged(tmp_path, monkeypatch):
 
     def failing_save(path, results):
         raise OSError("disk full")
-    monkeypatch.setattr(results, 'save_results', failing_save)
+    monkeypatch.setattr(results, 'save', failing_save)
 
     with pytest.raises(OSError):
         results.keep_entry(run, file, {'size': 64}, {'trial': 1, 'failure_reason': 'OOMKilled'})
@@ -267,27 +267,27 @@ def test_trial_is_done(entry, expected):
     assert results.trial_is_done(entry) is expected
 
 def test_load_missing_file(tmp_path):
-    assert results.load_results(tmp_path / "r.json") is None
+    assert results.load(tmp_path / "r.json") is None
 
 def test_save_then_load(tmp_path: Path):
     path = tmp_path/"x"/"y"/"r.json"
-    results.save_results(path, {"a": 1})
-    results.save_results(path, {"a": 2})
-    assert results.load_results(path) == {"a": 2}
+    results.save(path, {"a": 1})
+    results.save(path, {"a": 2})
+    assert results.load(path) == {"a": 2}
     assert os.listdir(path.parent) == ['r.json']
 
 def test_load_corrupt_file_crashes(tmp_path):
     path = tmp_path/"r.json"
     path.write_text('{"a": 1')
     with pytest.raises(json.JSONDecodeError):
-        results.load_results(path)
+        results.load(path)
 
 def test_failed_save_keeps_file(tmp_path):
     path = tmp_path/"r.json"
-    results.save_results(path, {"a": 1})
+    results.save(path, {"a": 1})
     with pytest.raises(TypeError):
-        results.save_results(path, {"b": object()})
-    assert results.load_results(path) == {"a": 1}
+        results.save(path, {"b": object()})
+    assert results.load(path) == {"a": 1}
 
 def results_file(image: str, trials: dict) -> dict:
     return {'environment': {'image': image}, 'trials': trials}

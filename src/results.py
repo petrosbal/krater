@@ -27,11 +27,11 @@ SETTINGS = ("duration", "warmup", "timeout", "cpu", "memory", "interval")
 def trial_key(combination: dict) -> str:
     return ', '.join(f"{k} = {v}" for k,v in sorted(combination.items()))
 
-def results_path(name: str, environment: dict) -> Path:
+def path(name: str, environment: dict) -> Path:
     safe_image_name = environment['image'].replace(':', '_').replace('/', '_')
     return Path("results") / name / f"{safe_image_name}_{environment['runtime_class']}.json"
 
-def results_header(run: dict, environment: dict) -> dict:
+def header(run: dict, environment: dict) -> dict:
     return {"environment": environment, 
             "settings": {key: run[key] for key in SETTINGS}}
 
@@ -75,13 +75,13 @@ def trial_is_done(entry: dict) -> bool:
         return False
     return min(timestamps) <= start and max(timestamps) >= end
 
-def load_results(path: Path) -> dict | None:
+def load(path: Path) -> dict | None:
     if not path.exists():
         return None
     with open(path, "r") as f:
         return json.load(f)
 
-def save_results(path: Path, results: dict) -> None:
+def save(path: Path, results: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".tmp")
 
@@ -90,14 +90,14 @@ def save_results(path: Path, results: dict) -> None:
     os.replace(tmp, path)
 
 def file_for(run: dict, environment: dict) -> tuple[dict | None, str | None]:
-    path = results_path(run['name'], environment)
-    header = results_header(run, environment)
-    stored = load_results(path)
+    file_path = path(run['name'], environment)
+    run_header = header(run, environment)
+    stored = load(file_path)
 
     if stored is None:
-        return {**header, 'trials': {}}, None
-    if (mismatch := header_mismatch(stored, header)) is not None:
-        return None, (f"existing results file ({path}) does not match this run:\n"
+        return {**run_header, 'trials': {}}, None
+    if (mismatch := header_mismatch(stored, run_header)) is not None:
+        return None, (f"existing results file ({file_path}) does not match this run:\n"
                       f"{mismatch}\n"
                       "set the config back, use a new run name, or move the file")
     return stored, None
@@ -107,11 +107,11 @@ def keep_entry(run: dict, file: dict, combination: dict, entry: dict) -> bool:
         return False
     key = trial_key(combination)
     entries = file['trials'].get(key, [])  + [entry]
-    path = results_path(run['name'], file['environment'])
+    file_path = path(run['name'], file['environment'])
 
     trials = file['trials'].copy()
     trials[key] = entries
-    save_results(path, {**file, 'trials': trials})
+    save(file_path, {**file, 'trials': trials})
 
     file['trials'] = trials
     return True
