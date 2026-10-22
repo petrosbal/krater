@@ -344,11 +344,11 @@ def closing_block(run: dict, files: list[dict], combinations: list[dict], to_rer
     still_to_run = f", {left} still to run" if left else ""
     incomplete = "incomplete this session:\n" + "\n".join(to_rerun) + "\n" if to_rerun else ""
 
-    return (f"{word} {now} after {timedelta(seconds=round(elapsed))}\n"
-            f"{len(entries)} of {total} trials saved "
+    return (f"{len(entries)} of {total} trials saved "
             f"({len(entries) - failed} ok, {failed} failed and saved as data){still_to_run}\n"
             f"{incomplete}"
-            f"\n{summary_table(files, combinations, run['trials'])}")
+            f"\n{summary_table(files, combinations, run['trials'])}\n"
+            f"\n{word} {now} after {timedelta(seconds=round(elapsed))}")
 
 def run_rounds(run: dict, files: list[dict], combinations: list[dict], pending: list,
                loop_started: float) -> tuple[list[str], bool]:
@@ -441,7 +441,7 @@ def main() -> None:
 
     pending = pending_trials(files, combinations, run['trials'])
     if pending:
-        print(banner(run, files, combinations, pending))
+        print(banner(run, files, combinations, pending), flush=True)
         if not user_confirmation():
             sys.exit("nothing ran")
 
