@@ -454,11 +454,11 @@ TRIAL_OUTCOME_ROWS = {
 def test_trial_outcome(entry, seconds, expected):
     assert harness.trial_outcome(entry, seconds) == expected
 
-@pytest.mark.parametrize("stopped, left, expected", [
+@pytest.mark.parametrize("was_stopped, trials_left, expected", [
     (False, 0, 0),
     (False, 1, 2),
     (True, 0, 130),
     (True, 1, 130),
 ])
-def test_exit_code(stopped, left, expected):
-    assert harness.exit_code(stopped, left) == expected
+def test_exit_code(was_stopped, trials_left, expected):
+    assert harness.exit_code(was_stopped, trials_left) == expected

@@ -145,9 +145,9 @@ def file_for(run: dict, environment: dict) -> tuple[dict | None, str | None]:
 
     if stored is None:
         return {**header, 'trials': {}}, None
-    if (msg := header_mismatch(stored, header)) is not None:
+    if (mismatch := header_mismatch(stored, header)) is not None:
         return None, (f"existing results file ({path}) does not match this run:\n"
-                      f"{msg}\n"
+                      f"{mismatch}\n"
                       "set the config back, use a new run name, or move the file")
     return stored, None
 
@@ -204,9 +204,9 @@ def run_trial(run: dict, environment: dict, combination: dict, trial_num: int) -
             texts.append(text)
             if text in MARKER_TIMES:
                 times[MARKER_TIMES[text]] = stamp
-                special_sample = cgroup.take_sample(cgroup_path, missing)
-                if special_sample is not None:
-                    samples.append(special_sample)
+                sample_at_marker = cgroup.take_sample(cgroup_path, missing)
+                if sample_at_marker is not None:
+                    samples.append(sample_at_marker)
 
         result = parse_result(texts)
         if result is None:
@@ -251,21 +251,20 @@ def rounded_duration(seconds: float) -> timedelta:
     return timedelta(seconds=round(seconds))
 
 def banner(run: dict, files: list[dict], combinations: list[dict], pending: list) -> str:
-    started = current_datetime()
-    u = platform.uname()
-    cells = len(files) * len(combinations)
-    total = cells * run['trials']
-    saved = total - len(pending)
+    session_start = current_datetime()
+    host = platform.uname()
+    total_trials = len(files) * len(combinations) * run['trials']
+    trials_saved = total_trials - len(pending)
     floor = len(pending) * (RUNNER_SLEEP + run['warmup'] + run['duration'] + RUNNER_TAIL_SLEEP)
     ceiling = len(pending) * run['timeout']
     folder = results_path(run['name'], files[0]['environment']).parent
-    resumed = f"{saved} already saved by an earlier run, {len(pending)} to run now\n" if saved else ""
+    resumed = f"{trials_saved} already saved by an earlier run, {len(pending)} to run now\n" if trials_saved else ""
 
-    return (f"KRATER run \"{run['name']}\" ({CONFIG_FILE}), started {started}\n"
-            f"on {u.node}, {u.system} {u.release}\n"
-            f"  cpu: {cgroup.cpu_model()} ({u.machine}), cpufreq governor {cgroup.cpu_governor()}\n"
-            f"{cells} combinations ({len(files)} environments x {len(combinations)} param sets), "
-            f"{run['trials']} trials each = {total} trials\n"
+    return (f"KRATER run \"{run['name']}\" ({CONFIG_FILE}), started {session_start}\n"
+            f"on {host.node}, {host.system} {host.release}\n"
+            f"  cpu: {cgroup.cpu_model()} ({host.machine}), cpufreq governor {cgroup.cpu_governor()}\n"
+            f"{len(files)} environments x {len(combinations)} param combinations x "
+            f"{run['trials']} trials = {total_trials} trials\n"
             f"{resumed}"
             f"each trial: {run['warmup']} s warmup, {run['duration']} s duration, timeout at {run['timeout']} s\n"
             f"estimated time: {rounded_duration(floor)} to {rounded_duration(ceiling)}\n"
@@ -291,9 +290,9 @@ def trial_label(file: dict, combination: dict, widths: tuple[int, int, int]) -> 
             f"{file['environment']['runtime_class']:<{rc_width}}  "
             f"{trial_key(combination):<{k_width}}  ")
 
-def trial_identity(k: int, total: int, label: str) -> str:
+def trial_identity(k: int, total_session_trials: int, label: str) -> str:
     started_at = datetime.now().strftime('%H:%M:%S')
-    return f"  [{k:>{len(str(total))}}/{total}] {started_at}  {label}"
+    return f"  [{k:>{len(str(total_session_trials))}}/{total_session_trials}] {started_at}  {label}"
 
 def describe_reason(reason: str) -> str:
     words = REASON_WORDS.get(reason)
@@ -312,13 +311,13 @@ def trial_outcome(entry: dict, seconds: float) -> str:
         return outcome_line('incomplete', seconds, f"{describe_reason(entry['failure_reason'])}, runs again next time")
     return outcome_line('incomplete', seconds, "samples missed the measured window, runs again next time")
 
-def round_line(n: int, trial_count: int, k: int, total: int, elapsed: float) -> str:
+def round_line(n: int, trial_count: int, k: int, total_session_trials: int, elapsed: float) -> str:
     now = current_datetime()
-    done = k - 1
-    if done == 0:
+    trials_done = k - 1
+    if trials_done == 0:
         return f"round {n} of {trial_count}, {now}"
-    left = rounded_duration(elapsed / done * (total - done))
-    return f"round {n} of {trial_count}, {now} ({rounded_duration(elapsed)} so far, about {left} left)"
+    time_left = rounded_duration(elapsed / trials_done * (total_session_trials - trials_done))
+    return f"round {n} of {trial_count}, {now} ({rounded_duration(elapsed)} so far, about {time_left} left)"
 
 def summary_table(files: list[dict], combinations: list[dict], trial_count: int) -> str:
     col_widths = widths(files, combinations)
@@ -332,32 +331,32 @@ def summary_table(files: list[dict], combinations: list[dict], trial_count: int)
                     reason = e['failure_reason']
                     failure_words.append(REASON_WORDS.get(reason, reason))
             counts = Counter(failure_words)
-            failed = ', '.join(f"{count} {words}" for words, count in counts.items())
+            failure_text = ', '.join(f"{count} {words}" for words, count in counts.items())
 
-            saved = f"{len(entries):>{len(str(trial_count))}}/{trial_count} saved"
-            of_which = f", of which {failed}" if failed else ""
-            rows.append(f"  {trial_label(file, combination, col_widths)}{saved}{of_which}")
+            saved_text = f"{len(entries):>{len(str(trial_count))}}/{trial_count} saved"
+            of_which = f", of which {failure_text}" if failure_text else ""
+            rows.append(f"  {trial_label(file, combination, col_widths)}{saved_text}{of_which}")
     return '\n'.join(rows)
 
 def closing_block(run: dict, files: list[dict], combinations: list[dict], to_rerun: list[str],
-                  elapsed: float, word: str) -> str:
+                  elapsed: float, ending: str) -> str:
     now = current_datetime()
-    total = len(files) * len(combinations) * run['trials']
+    total_trials = len(files) * len(combinations) * run['trials']
     entries = []
     for file in files:
         for combination in combinations:
             entries.extend(saved_trials(file, combination, run['trials']).values())
-    failed = sum(1 for e in entries if 'failure_reason' in e)
-    left = len(pending_trials(files, combinations, run['trials']))
+    trials_failed = sum(1 for e in entries if 'failure_reason' in e)
+    trials_left = len(pending_trials(files, combinations, run['trials']))
 
-    still_to_run = f", {left} still to run" if left else ""
+    still_to_run = f", {trials_left} still to run" if trials_left else ""
     incomplete = "incomplete this session:\n" + "\n".join(to_rerun) + "\n" if to_rerun else ""
 
-    return (f"{len(entries)} of {total} trials saved "
-            f"({len(entries) - failed} ok, {failed} failed and saved as data){still_to_run}\n"
+    return (f"{len(entries)} of {total_trials} trials saved "
+            f"({len(entries) - trials_failed} ok, {trials_failed} failed and saved as data){still_to_run}\n"
             f"{incomplete}"
             f"\n{summary_table(files, combinations, run['trials'])}\n"
-            f"\n{word} {now} after {rounded_duration(elapsed)}")
+            f"\n{ending} {now} after {rounded_duration(elapsed)}")
 
 def run_rounds(run: dict, files: list[dict], combinations: list[dict], pending: list,
                loop_started: float) -> tuple[list[str], bool]:
@@ -374,7 +373,7 @@ def run_rounds(run: dict, files: list[dict], combinations: list[dict], pending: 
             line = trial_identity(k, len(pending), label)
             print(line, end='', flush=True)
 
-            started = time.time()
+            trial_start = time.time()
             try:
                 entry = run_trial(run, file['environment'], combination, n)
             # kubectl(), find_cgroup() and stream_logs() throw Runtime
@@ -382,16 +381,16 @@ def run_rounds(run: dict, files: list[dict], combinations: list[dict], pending: 
             # and a bad log timestamp would be Value
             except (RuntimeError, OSError, ValueError) as e:
                 error_text = str(e).split('\n')[0] or type(e).__name__
-                outcome = outcome_line('incomplete', time.time() - started, f"{error_text}, runs again next time")
+                outcome = outcome_line('incomplete', time.time() - trial_start, f"{error_text}, runs again next time")
                 print(outcome)
                 to_rerun.append(line + outcome)
                 continue
 
-            done = keep_entry(run, file, combination, entry)
-            outcome = trial_outcome(entry, time.time() - started)
+            was_kept = keep_entry(run, file, combination, entry)
+            outcome = trial_outcome(entry, time.time() - trial_start)
             print(outcome)
 
-            if not done:
+            if not was_kept:
                 to_rerun.append(line + outcome)
     except KeyboardInterrupt:
         print(flush=True)
@@ -400,14 +399,14 @@ def run_rounds(run: dict, files: list[dict], combinations: list[dict], pending: 
 
     return to_rerun, False
 
-def outcome_line(word: str, seconds: float, detail: str = '') -> str:
+def outcome_line(status: str, seconds: float, detail: str = '') -> str:
     detail_text = f"  {detail}" if detail else ""
-    return f"{word:<10}  {seconds:5.1f} s{detail_text}"
+    return f"{status:<10}  {seconds:5.1f} s{detail_text}"
 
-def exit_code(stopped: bool, left: int) -> int:
-    if stopped:
+def exit_code(was_stopped: bool, trials_left: int) -> int:
+    if was_stopped:
         return 130
-    elif left > 0:
+    elif trials_left > 0:
         return 2
     return 0
 
@@ -417,9 +416,9 @@ def main() -> None:
         sys.exit(f"config: {problem}")
 
     environments = load_environments()
-    msg = validate(config, environments)
-    if msg is not None:
-        sys.exit(f"config: {msg}")
+    problem = validate(config, environments)
+    if problem is not None:
+        sys.exit(f"config: {problem}")
 
     run = config['run']
     selected_envs = select_environments(environments, run['runtimes'])
@@ -459,12 +458,12 @@ def main() -> None:
         print(f"run \"{run['name']}\" is complete, nothing to run")
 
     loop_started = time.time()
-    to_rerun, stopped = run_rounds(run, files, combinations, pending, loop_started)
+    to_rerun, was_stopped = run_rounds(run, files, combinations, pending, loop_started)
 
     print(closing_block(run, files, combinations, to_rerun, 
-                        time.time() - loop_started, 'stopped' if stopped else 'finished'))
-    left = len(pending_trials(files, combinations, run['trials']))
-    sys.exit(exit_code(stopped, left))
+                        time.time() - loop_started, 'stopped' if was_stopped else 'finished'))
+    trials_left = len(pending_trials(files, combinations, run['trials']))
+    sys.exit(exit_code(was_stopped, trials_left))
 
 if __name__ == "__main__":
     # Ctrl-C before the rounds, while loading, in the dry run or at the prompt
