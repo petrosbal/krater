@@ -250,25 +250,39 @@ def current_datetime() -> str:
 def rounded_duration(seconds: float) -> timedelta:
     return timedelta(seconds=round(seconds))
 
+def boxed(title: str, lines: list[str]) -> str:
+    inner_width = max(len(title) + 2, *(len(line) for line in lines))
+    top = f"┌─ {title} " + "─" * (inner_width - len(title) - 1) + "┐"
+    middle = [f"│ {line:<{inner_width}} │" for line in lines]
+    bottom = "└" + "─" * (inner_width + 2) + "┘"
+    return "\n".join([top, *middle, bottom])
+
 def banner(run: dict, files: list[dict], combinations: list[dict], pending: list) -> str:
-    session_start = current_datetime()
     host = platform.uname()
     total_trials = len(files) * len(combinations) * run['trials']
     trials_saved = total_trials - len(pending)
     floor = len(pending) * (RUNNER_SLEEP + run['warmup'] + run['duration'] + RUNNER_TAIL_SLEEP)
     ceiling = len(pending) * run['timeout']
     folder = results_path(run['name'], files[0]['environment']).parent
-    resumed = f"{trials_saved} already saved by an earlier run, {len(pending)} to run now\n" if trials_saved else ""
 
-    return (f"KRATER run \"{run['name']}\" ({CONFIG_FILE}), started {session_start}\n"
-            f"on {host.node}, {host.system} {host.release}\n"
-            f"  cpu: {cgroup.cpu_model()} ({host.machine}), cpufreq governor {cgroup.cpu_governor()}\n"
-            f"{len(files)} environments x {len(combinations)} param combinations x "
-            f"{run['trials']} trials = {total_trials} trials\n"
-            f"{resumed}"
-            f"each trial: {run['warmup']} s warmup, {run['duration']} s duration, timeout at {run['timeout']} s\n"
-            f"estimated time: {rounded_duration(floor)} to {rounded_duration(ceiling)}\n"
-            f"results: {folder}/\n"
+    rows = [("started", current_datetime()),
+            ("host", f"{host.node}, {host.system} {host.release}"),
+            ("cpu", f"{cgroup.cpu_model()} ({host.machine})"),
+            ("governor", cgroup.cpu_governor()),
+            None,
+            ("trials", f"{len(files)} environments x {len(combinations)} param combinations "
+                       f"x {run['trials']} = {total_trials}")]
+    if trials_saved:
+        rows.append(("resumed", f"{trials_saved} saved by an earlier run, {len(pending)} to run now"))
+    rows += [("each", f"{run['warmup']} s warmup, {run['duration']} s duration, timeout at {run['timeout']} s"),
+             ("estimate", f"{rounded_duration(floor)} to {rounded_duration(ceiling)}"),
+             ("results", f"{folder}/")]
+
+    label_width = max(len(row[0]) for row in rows if row is not None)
+    lines = ["" if row is None else f"{row[0]:<{label_width}}  {row[1]}" for row in rows]
+    title = f'KRATER run "{run["name"]}" ({CONFIG_FILE})'
+
+    return ("\n" + boxed(title, lines) + "\n"
             "Ctrl-C stops safely at any time. Run the same command to continue.")
 
 def user_confirmation() -> bool:

@@ -492,3 +492,26 @@ def test_dry_run_refusal_text(error_text, hint):
 
     text = harness.dry_run_refusal_text(run, environment, RuntimeError(error_text))
     assert text == f"{first_line}kubernetes error: {error_text}{hint}"
+
+BOXED_ROWS = {
+    "rows wider than the title": (
+        "t", ["abcd", "", "ab"],
+        "┌─ t ──┐\n"
+        "│ abcd │\n"
+        "│      │\n"
+        "│ ab   │\n"
+        "└──────┘",
+    ),
+    "a title wider than the rows": (
+        "title", ["ab"],
+        "┌─ title ─┐\n"
+        "│ ab      │\n"
+        "└─────────┘",
+    ),
+}
+
+@pytest.mark.parametrize("title, lines, expected",
+    BOXED_ROWS.values(), ids=BOXED_ROWS.keys(),
+)
+def test_boxed(title, lines, expected):
+    assert harness.boxed(title, lines) == expected
