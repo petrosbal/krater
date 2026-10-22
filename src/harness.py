@@ -403,6 +403,15 @@ def outcome_line(status: str, seconds: float, detail: str = '') -> str:
     detail_text = f"  {detail}" if detail else ""
     return f"{status:<10}  {seconds:5.1f} s{detail_text}"
 
+def dry_run_refusal_text(run: dict, environment: dict, error: RuntimeError) -> str:
+    namespace = run["namespace"]
+    hint = ""
+    if f"namespaces \"{namespace}\" not found" in str(error):
+        hint = f"\nto create it, run:\nkubectl create namespace {namespace}"
+    return (f"dry run for {environment['target']} on {environment['runtime_class']} failed with "
+            f"cpu = {run['cpu']}, memory = {run['memory']} in namespace '{namespace}'\n"
+            f"kubernetes error: {error}{hint}")
+
 def exit_code(was_stopped: bool, trials_left: int) -> int:
     if was_stopped:
         return 130
@@ -445,9 +454,7 @@ def main() -> None:
         try:
             pod.dry_run(trial_manifest(run, env, combinations[0]))
         except RuntimeError as e:
-            sys.exit(f"dry run for {env['target']} on {env['runtime_class']} failed with "
-                     f"cpu = {run['cpu']}, memory = {run['memory']} in namespace '{run['namespace']}'\n"
-                     f"kubernetes error: {e}")
+            sys.exit(dry_run_refusal_text(run, env, e))
 
     pending = pending_trials(files, combinations, run['trials'])
     if pending:

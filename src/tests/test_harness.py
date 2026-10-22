@@ -462,3 +462,33 @@ def test_trial_outcome(entry, seconds, expected):
 ])
 def test_exit_code(was_stopped, trials_left, expected):
     assert harness.exit_code(was_stopped, trials_left) == expected
+
+DRY_RUN_REFUSAL_ROWS = {
+    "the namespace is missing": (
+        'Error from server (NotFound): error when creating "STDIN": '
+        'namespaces "krater-testing" not found',
+        "\nto create it, run:\nkubectl create namespace krater-testing",
+    ),
+    "a different thing is not found": (
+        'Error from server (Forbidden): error when creating "STDIN": '
+        'pods "krater-dry-run" is forbidden: pod rejected: RuntimeClass "wasmedgee" not found',
+        "",
+    ),
+    "a bad cpu value": (
+        'The Pod "krater-dry-run" is invalid: '
+        'spec.containers[0].resources.limits[cpu]: Invalid value: "lots"',
+        "",
+    ),
+}
+
+@pytest.mark.parametrize("error_text, hint",
+    DRY_RUN_REFUSAL_ROWS.values(), ids=DRY_RUN_REFUSAL_ROWS.keys(),
+)
+def test_dry_run_refusal_text(error_text, hint):
+    run = {'cpu': '1000m', 'memory': '1024Mi', 'namespace': 'krater-testing'}
+    environment = {'target': 'native', 'runtime_class': 'default'}
+    first_line = ("dry run for native on default failed with "
+                  "cpu = 1000m, memory = 1024Mi in namespace 'krater-testing'\n")
+
+    text = harness.dry_run_refusal_text(run, environment, RuntimeError(error_text))
+    assert text == f"{first_line}kubernetes error: {error_text}{hint}"
