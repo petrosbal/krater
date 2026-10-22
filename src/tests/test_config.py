@@ -1,4 +1,5 @@
 import pytest
+
 from config import load_config, load_environments, validate
 
 ENVIRONMENTS = load_environments()

@@ -1,6 +1,8 @@
-import pytest
-import pod
 import json
+
+import pytest
+
+import pod
 
 PARSE_LOG_LINE_ROWS = {
     "offset, nine digits": (
@@ -123,4 +125,3 @@ def test_dry_run(monkeypatch):
     assert args == ('apply', '--dry-run=server', '-f', '-')
     assert json.loads(stdin)['metadata']['name'] == 'krater-dry-run'
     assert manifest['metadata']['name'] == 'krater-trial'
-    

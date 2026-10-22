@@ -13,6 +13,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""trial.py
+
+Conducts one trial against the cluster and returns its entry. Deletes the
+pod no matter how the trial ends.
+"""
+
 import json
 import threading
 
@@ -61,8 +67,8 @@ def conduct(run: dict, environment: dict, combination: dict, trial_num: int) -> 
         cgroup_path = cgroup.find_cgroup(container_id)
         missing = cgroup.missing_fields(cgroup_path)
         monitor = threading.Thread(
-            target = cgroup.sample_until,
-            args = (cgroup_path, missing, run['interval'], stop, samples)
+            target=cgroup.sample_until,
+            args=(cgroup_path, missing, run['interval'], stop, samples)
         )
         monitor.start()
         texts = []
@@ -88,7 +94,7 @@ def conduct(run: dict, environment: dict, combination: dict, trial_num: int) -> 
 
     # two writers fill samples, the sampler thread and the marker samples
     # so they arrive out of order
-    samples.sort(key = lambda s: s['timestamp'])
+    samples.sort(key=lambda s: s['timestamp'])
     entry = { "trial": trial_num,
               "times": times,
               "log": texts,

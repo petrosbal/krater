@@ -13,8 +13,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import yaml
+"""config.py
+
+Loads krater.yaml and the environments file and validates the run. Instead of
+exiting itself, it returns a problem for the harness to handle.
+"""
+
 import re
+
+import yaml
 
 CONFIG_FILE = 'krater.yaml'
 ENVIRONMENTS_FILE = "dice/generated/available_environments.yaml"
@@ -61,7 +68,7 @@ def validate(config, environments) -> str | None:
         return "config is empty or not a valid dict"
     if unknown := set(config) - {"run"}:
         return f"unknown top-level keys: {name_list(unknown)}"
-    
+
     run = config.get('run')
     if not isinstance(run, dict):
         return "'run' must be a dict"
@@ -142,3 +149,4 @@ def validate_params(params) -> str | None:
         # values that look the same to the pod, like 256 and '256'
         if len(valuelist) != len({str(v) for v in valuelist}):
             return f"parameter {name!r} has duplicate values"
+    return None

@@ -13,21 +13,27 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""harness.py
+
+Runs a benchmarking session. The only module that prints, exits or reads stdin.
+"""
+
 import itertools
 import sys
 import time
 
+import cgroup
+import console
+import pod
+import results
+import trial
 from config import (
     load_config,
     load_environments,
     select_environments,
     validate,
 )
-import cgroup
-import pod
-import results
-import console
-import trial
+
 
 # cartesian product. takes {'size': [5, 10], 'mode': ['a', 'b']} and returns
 #       1. {'size': 5,  'mode': 'a'}
@@ -110,7 +116,7 @@ def main() -> None:
 
     files = []
     for environment in selected_envs:
-        file, problem = results.file_for(run, environment) 
+        file, problem = results.file_for(run, environment)
         if problem is not None:
             sys.exit(problem)
         files.append(file)
@@ -142,7 +148,7 @@ def main() -> None:
     loop_started = time.time()
     to_rerun, was_stopped = run_rounds(run, files, combinations, pending, loop_started)
 
-    print(console.closing_block(run, files, combinations, to_rerun, 
+    print(console.closing_block(run, files, combinations, to_rerun,
                         time.time() - loop_started, 'stopped' if was_stopped else 'finished'))
     trials_left = len(results.pending_trials(files, combinations, run['trials']))
     sys.exit(exit_code(was_stopped, trials_left))

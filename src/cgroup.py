@@ -13,14 +13,21 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from pathlib import Path
+"""cgroup.py
+
+Finds a container's cgroup and samples it, and reads the node's cpu model and
+governor. Only reads files.
+"""
+
 import threading
 import time
+from pathlib import Path
+
 
 def find_cgroup(container_id: str, root_path: Path = Path("/sys/fs/cgroup")) -> Path:
     if container_id == "":
         raise RuntimeError("container_id is empty")
-    
+
     matches = list(root_path.rglob(f"*{container_id}*"))
     if len(matches) != 1:
         raise RuntimeError(f"found {len(matches)} matches for container {container_id[:12]!r}")

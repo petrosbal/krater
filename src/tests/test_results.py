@@ -7,6 +7,7 @@ import pytest
 import results
 from config import RUN_KEYS
 
+
 def test_every_run_key_is_placed():
     assert RUN_KEYS - set(results.SETTINGS) == {"name", "params", "runtimes", "trials", "namespace"}
 
@@ -19,10 +20,10 @@ def test_trial_key(combination, expected):
     assert results.trial_key(combination) == expected
 
 @pytest.mark.parametrize("name, environment, expected", [
-    ('benchmark_1', 
+    ('benchmark_1',
      {'image': 'krater:matmul_wasm', 'runtime_class': 'wasmtime'},
      Path('results/benchmark_1/krater_matmul_wasm_wasmtime.json')),
-    ('b', 
+    ('b',
      {'image': 'reg/krater:x', 'runtime_class': 'default'},
      Path('results/b/reg_krater_x_default.json')),
 ])
@@ -125,7 +126,7 @@ def test_keep_entry_drops_an_entry_that_is_not_done(tmp_path, monkeypatch):
 def test_keep_entry_failed_save_leaves_file_unchanged(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     run = {**RESULTS_HEADER_RUN, 'name': 'b'}
-    file, problem = results.file_for(run, RESULTS_HEADER_ENVIRONMENT)
+    file, _ = results.file_for(run, RESULTS_HEADER_ENVIRONMENT)
     assert file is not None
 
     def failing_save(path, results):

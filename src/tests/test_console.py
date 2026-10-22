@@ -40,18 +40,18 @@ def test_trial_outcome(entry, seconds, expected):
 
 DRY_RUN_REFUSAL_ROWS = {
     "the namespace is missing": (
-        'Error from server (NotFound): error when creating "STDIN": '
-        'namespaces "krater-testing" not found',
+        ('Error from server (NotFound): error when creating "STDIN": '
+         'namespaces "krater-testing" not found'),
         "\nto create it, run:\nkubectl create namespace krater-testing",
     ),
     "a different thing is not found": (
-        'Error from server (Forbidden): error when creating "STDIN": '
-        'pods "krater-dry-run" is forbidden: pod rejected: RuntimeClass "wasmedgee" not found',
+        ('Error from server (Forbidden): error when creating "STDIN": '
+         'pods "krater-dry-run" is forbidden: pod rejected: RuntimeClass "wasmedgee" not found'),
         "",
     ),
     "a bad cpu value": (
-        'The Pod "krater-dry-run" is invalid: '
-        'spec.containers[0].resources.limits[cpu]: Invalid value: "lots"',
+        ('The Pod "krater-dry-run" is invalid: '
+         'spec.containers[0].resources.limits[cpu]: Invalid value: "lots"'),
         "",
     ),
 }
@@ -71,17 +71,17 @@ def test_dry_run_refusal_text(error_text, hint):
 BOXED_ROWS = {
     "rows wider than the title": (
         "t", ["abcd", "", "ab"],
-        "┌─ t ──┐\n"
-        "│ abcd │\n"
-        "│      │\n"
-        "│ ab   │\n"
-        "└──────┘",
+        ("┌─ t ──┐\n"
+         "│ abcd │\n"
+         "│      │\n"
+         "│ ab   │\n"
+         "└──────┘"),
     ),
     "a title wider than the rows": (
         "title", ["ab"],
-        "┌─ title ─┐\n"
-        "│ ab      │\n"
-        "└─────────┘",
+        ("┌─ title ─┐\n"
+         "│ ab      │\n"
+         "└─────────┘"),
     ),
 }
 

@@ -13,6 +13,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""console.py
+
+Builds the text of every line on screen, from banner to closing
+block. Prints absolutely nothing.
+"""
+
 import platform
 from collections import Counter
 from datetime import datetime, timedelta
@@ -55,8 +61,8 @@ def banner(run: dict, files: list[dict], combinations: list[dict], pending: list
             ("cpu", f"{model} ({host.machine})"),
             ("governor", governor),
             None,
-            ("trials", f"{len(files)} environments x {len(combinations)} param combinations "
-                       f"x {run['trials']} = {total_trials}")]
+            ("trials", (f"{len(files)} environments x {len(combinations)} param combinations "
+                        f"x {run['trials']} = {total_trials}"))]
     if trials_saved:
         rows.append(("resumed", f"{trials_saved} saved by an earlier run, {len(pending)} to run now"))
     rows += [("each", f"{run['warmup']} s warmup, {run['duration']} s duration, timeout at {run['timeout']} s"),

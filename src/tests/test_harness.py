@@ -1,8 +1,10 @@
 import pytest
+
 import harness
 import trial
 
-def test_combinations():
+
+def test_param_combinations():
     value = harness.param_combinations({'size': [5, 10], 'mode': ['a', 'b']})
     expected = [{'size': 5,  'mode': 'a'},
                 {'size': 5,  'mode': 'b'},
@@ -10,7 +12,7 @@ def test_combinations():
                 {'size': 10, 'mode': 'b'},]
     assert value == expected
 
-def test_combinations_without_params():
+def test_param_combinations_without_params():
     assert harness.param_combinations({}) == [{}]
 
 def test_run_rounds_stops_properly(monkeypatch, capsys):

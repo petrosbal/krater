@@ -13,6 +13,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""results.py
+
+Reads, judges and saves the results files. The only module that writes them,
+and a save replaces the file whole, so a crash can't corrupt them.
+"""
+
 import json
 import os
 from pathlib import Path
@@ -32,14 +38,14 @@ def path(name: str, environment: dict) -> Path:
     return Path("results") / name / f"{safe_image_name}_{environment['runtime_class']}.json"
 
 def header(run: dict, environment: dict) -> dict:
-    return {"environment": environment, 
+    return {"environment": environment,
             "settings": {key: run[key] for key in SETTINGS}}
 
 def header_mismatch(stored: dict, header: dict) -> str | None:
     if not isinstance(stored, dict):
         return f"expected stored file to be a dict, got {type(stored).__name__}"
 
-    for section in header:
+    for section, expected_section in header.items():
         stored_section = stored.get(section, {})
         if not isinstance(stored_section, dict):
             return f"stored section {section!r} is not a dict"
@@ -48,8 +54,8 @@ def header_mismatch(stored: dict, header: dict) -> str | None:
             if not is_number(value) and not isinstance(value, str):
                 return f"value of key {key!r} in section {section!r} ({value!r}) is not a number or string"
 
-        only_in_file = sorted(stored_section.items() - header[section].items())
-        only_in_config = sorted(header[section].items() - stored_section.items())
+        only_in_file = sorted(stored_section.items() - expected_section.items())
+        only_in_config = sorted(expected_section.items() - stored_section.items())
         if only_in_file or only_in_config:
             return (f"{section}:\n"
                     f"  file has {only_in_file}\n"
@@ -58,6 +64,7 @@ def header_mismatch(stored: dict, header: dict) -> str | None:
     trials = stored.get('trials')
     if not isinstance(trials, dict):
         return f"expected 'trials' section in stored file to be a dict, got {type(trials).__name__}"
+    return None
 
 def trial_is_done(entry: dict) -> bool:
     if entry.get('failure_reason') in DONE_REASONS:
@@ -102,6 +109,8 @@ def file_for(run: dict, environment: dict) -> tuple[dict | None, str | None]:
                       "set the config back, use a new run name, or move the file")
     return stored_file, None
 
+# an entry holds trial, times, log, result and samples, plus failure_reason when there's one.
+# trial.conduct builds every entry, this module just judges and saves it
 def keep_entry(run: dict, file: dict, combination: dict, entry: dict) -> bool:
     if not trial_is_done(entry):
         return False

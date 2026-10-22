@@ -2,7 +2,8 @@ import pytest
 
 import trial
 
-def test_trial_env():
+
+def test_env_stringifies_the_params():
     combination = {'size': 256}
     value = trial.env(combination, 2, 0)
     expected = {'size': '256', 'KRATER_DURATION': '2.0', 'KRATER_WARMUP': '0.0'}
@@ -37,6 +38,10 @@ PARSE_RESULT_ROWS = {
     "first one wins": (
         ['BENCH_RESULT {"a": 1}', 'BENCH_RESULT {"a": 2}'],
         {'a': 1},
+    ),
+    "a broken first result hides a valid second": (
+        ['BENCH_RESULT {"a": 1', 'BENCH_RESULT {"a": 2}'],
+        None,
     ),
     "similar line before it": (
         ['BENCH_RESULTS follow', 'BENCH_RESULT {"a": 1}'],

@@ -13,12 +13,18 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""pod.py
+
+Runs every kubectl call. The only module that starts a process,
+and a failed call raises RuntimeError for the caller to judge.
+"""
+
 import json
 import subprocess
 import threading
 import time
-from datetime import datetime
 from collections.abc import Iterator
+from datetime import datetime
 
 POD_NAME = "krater-trial"
 DRY_RUN_POD_NAME = "krater-dry-run"
@@ -60,7 +66,7 @@ def manifest(environment: dict, trial_vars: dict, run: dict) -> dict:
             "spec": spec}
 
 def kubectl(*args: str, stdin: str | None = None) -> str:
-    cmd_result = subprocess.run(["kubectl", *args], input=stdin, capture_output=True, text=True)
+    cmd_result = subprocess.run(["kubectl", *args], input=stdin, capture_output=True, text=True, check=False)
     if cmd_result.returncode != 0:
         raise RuntimeError(cmd_result.stderr.strip())
     return cmd_result.stdout
@@ -77,17 +83,17 @@ def container_id(namespace: str, timeout: int) -> str:
             "-o", jsonpath).removeprefix("containerd://")
 
 def delete(namespace: str) -> None:
-    kubectl("delete", "pod", POD_NAME, "-n", namespace, 
+    kubectl("delete", "pod", POD_NAME, "-n", namespace,
             "--grace-period=0", "--force", "--ignore-not-found")
 
 def phase(namespace: str) -> str:
-    return kubectl("get", "pod", POD_NAME, "-n", namespace, "-o", 
+    return kubectl("get", "pod", POD_NAME, "-n", namespace, "-o",
                    "jsonpath={.status.phase}", "--ignore-not-found")
 
 def failure_reason(namespace: str) -> str:
-    pod_reason = kubectl("get", "pod", POD_NAME, "-n", namespace, 
+    pod_reason = kubectl("get", "pod", POD_NAME, "-n", namespace,
                          "-o", "jsonpath={.status.reason}")
-    container_reason = kubectl("get", "pod", POD_NAME, "-n", namespace, 
+    container_reason = kubectl("get", "pod", POD_NAME, "-n", namespace,
                                "-o", "jsonpath={.status.containerStatuses[0].state.terminated.reason}")
     # a deadline sets only the pod's reason
     # OOMKilled and Error set only the container's
