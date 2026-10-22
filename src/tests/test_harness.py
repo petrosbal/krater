@@ -1,5 +1,6 @@
 import pytest
 import harness
+import trial
 
 def test_combinations():
     value = harness.param_combinations({'size': [5, 10], 'mode': ['a', 'b']})
@@ -15,7 +16,7 @@ def test_combinations_without_params():
 def test_run_rounds_stops_properly(monkeypatch, capsys):
     def keyboard_interrupt(run, environment, combination, trial_num):
         raise KeyboardInterrupt
-    monkeypatch.setattr(harness, 'run_trial', keyboard_interrupt)
+    monkeypatch.setattr(trial, 'run', keyboard_interrupt)
 
     run = {'trials': 1}
     files = [{'environment': {'target': 'wasm', 'runtime_class': 'wasmtime'}}]

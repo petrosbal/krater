@@ -4,7 +4,7 @@ import trial
 
 def test_trial_env():
     combination = {'size': 256}
-    value = trial.trial_env(combination, 2, 0)
+    value = trial.env(combination, 2, 0)
     expected = {'size': '256', 'KRATER_DURATION': '2.0', 'KRATER_WARMUP': '0.0'}
     assert value == expected
     assert combination == {'size': 256}

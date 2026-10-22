@@ -27,11 +27,11 @@ MARKER_TIMES = {
 
 BENCH_RESULT_PREFIX = "BENCH_RESULT "
 
-def trial_env(combination: dict, duration, warmup) -> dict:
-    env = {k: str(v) for k, v in combination.items()}
-    env['KRATER_DURATION'] = str(float(duration))
-    env['KRATER_WARMUP'] = str(float(warmup))
-    return env
+def env(combination: dict, duration, warmup) -> dict:
+    variables = {k: str(v) for k, v in combination.items()}
+    variables['KRATER_DURATION'] = str(float(duration))
+    variables['KRATER_WARMUP'] = str(float(warmup))
+    return variables
 
 def parse_result(texts: list[str]) -> dict | None:
     for text in texts:
@@ -43,12 +43,12 @@ def parse_result(texts: list[str]) -> dict | None:
                 return None
     return None
 
-def trial_manifest(run: dict, environment: dict, combination: dict) -> dict:
-    trial_vars = trial_env(combination, run['duration'], run['warmup'])
+def manifest(run: dict, environment: dict, combination: dict) -> dict:
+    trial_vars = env(combination, run['duration'], run['warmup'])
     return pod.manifest(environment, trial_vars, run)
 
-def run_trial(run: dict, environment: dict, combination: dict, trial_num: int) -> dict:
-    manifest = trial_manifest(run, environment, combination)
+def run(run: dict, environment: dict, combination: dict, trial_num: int) -> dict:
+    pod_manifest = manifest(run, environment, combination)
     stop = threading.Event()
     samples = []
     times = {}
@@ -56,7 +56,7 @@ def run_trial(run: dict, environment: dict, combination: dict, trial_num: int) -
     failure_reason = None
 
     try:
-        times["applied"] = pod.start(manifest)
+        times["applied"] = pod.start(pod_manifest)
         container_id = pod.container_id(run['namespace'], run['timeout'])
         cgroup_path = cgroup.find_cgroup(container_id)
         missing = cgroup.missing_fields(cgroup_path)

@@ -37,7 +37,7 @@ from console import (
     trial_outcome,
     widths,
 )
-from trial import run_trial, trial_manifest
+import trial
 
 # cartesian product. takes {'size': [5, 10], 'mode': ['a', 'b']} and returns
 #       1. {'size': 5,  'mode': 'a'}
@@ -73,7 +73,7 @@ def run_rounds(run: dict, files: list[dict], combinations: list[dict], pending: 
 
             trial_start = time.time()
             try:
-                entry = run_trial(run, file['environment'], combination, n)
+                entry = trial.run(run, file['environment'], combination, n)
             # kubectl(), find_cgroup() and stream_logs() throw Runtime
             # a cgroup file that vanished or kubectl missing would be OS
             # and a bad log timestamp would be Value
@@ -137,7 +137,7 @@ def main() -> None:
 
     for env in selected_envs:
         try:
-            pod.dry_run(trial_manifest(run, env, combinations[0]))
+            pod.dry_run(trial.manifest(run, env, combinations[0]))
         except RuntimeError as e:
             sys.exit(dry_run_refusal_text(run, env, e))
 
