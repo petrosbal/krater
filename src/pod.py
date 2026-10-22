@@ -91,7 +91,7 @@ def failure_reason(namespace: str) -> str:
 
 def stream_logs(namespace: str, timeout: float) -> Iterator[tuple[float, str]]:
     proc = subprocess.Popen(["kubectl", "logs", "-f", "--timestamps", POD_NAME, "-n", namespace],
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="replace")
     assert proc.stdout is not None and proc.stderr is not None
     watchdog = threading.Timer(timeout, proc.kill)
     watchdog.start()
