@@ -215,6 +215,8 @@ def run_trial(run: dict, environment: dict, combination: dict, trial_num: int) -
             monitor.join()
         pod.delete(run['namespace'])
 
+    # two writers fill samples, the sampler thread and the marker samples
+    # so they arrive out of order
     samples.sort(key = lambda s: s['timestamp'])
     entry = { "trial": trial_num,
               "times": times,
@@ -454,6 +456,8 @@ def main() -> None:
     sys.exit(exit_code(stopped, left))
 
 if __name__ == "__main__":
+    # Ctrl-C before the rounds, while loading, in the dry run or at the prompt
+    # run_rounds handles it during the rounds
     try:
         main()
     except KeyboardInterrupt:

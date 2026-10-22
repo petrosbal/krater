@@ -25,6 +25,8 @@ DRY_RUN_POD_NAME = "krater-dry-run"
 
 def parse_log_line(line: str) -> tuple[float, str]:
     stamp, text = line.split(' ', maxsplit=1)
+    # 3.10's fromisoformat takes neither Z nor nine fraction digits
+    # so the fraction's cut out and added back as a float
     if stamp.endswith("Z"):
         offset = "+00:00"
         fraction = stamp[19:-1]
@@ -87,7 +89,9 @@ def failure_reason(namespace: str) -> str:
                          "-o", "jsonpath={.status.reason}")
     container_reason = kubectl("get", "pod", POD_NAME, "-n", namespace, 
                                "-o", "jsonpath={.status.containerStatuses[0].state.terminated.reason}")
-    return pod_reason or container_reason # first non empty one
+    # a deadline sets only the pod's reason
+    # OOMKilled and Error set only the container's
+    return pod_reason or container_reason
 
 def stream_logs(namespace: str, timeout: float) -> Iterator[tuple[float, str]]:
     proc = subprocess.Popen(["kubectl", "logs", "-f", "--timestamps", POD_NAME, "-n", namespace],
@@ -99,6 +103,8 @@ def stream_logs(namespace: str, timeout: float) -> Iterator[tuple[float, str]]:
     try:
         for line in proc.stdout:
             yield parse_log_line(line.removesuffix("\n"))
+        # the watchdog's kill exits negative and just ends the stream
+        # only kubectl's own failure exits above 0
         if proc.wait() > 0:
             raise RuntimeError(proc.stderr.read().strip())
     finally:
