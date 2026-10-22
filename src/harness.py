@@ -14,9 +14,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import itertools
-import json
 import sys
-import threading
 import time
 
 from config import (
@@ -39,14 +37,7 @@ from console import (
     trial_outcome,
     widths,
 )
-
-MARKER_TIMES = {
-    "MAIN_START": "main_start",
-    "BENCH_START": "bench_start",
-    "BENCH_END": "bench_end"
-}
-
-BENCH_RESULT_PREFIX = "BENCH_RESULT "
+from trial import run_trial, trial_manifest
 
 # cartesian product. takes {'size': [5, 10], 'mode': ['a', 'b']} and returns
 #       1. {'size': 5,  'mode': 'a'}
@@ -56,78 +47,6 @@ BENCH_RESULT_PREFIX = "BENCH_RESULT "
 def param_combinations(params: dict) -> list[dict]:
     value_combinations = itertools.product(*params.values())
     return [dict(zip(params.keys(), combination)) for combination in value_combinations]
-
-def trial_env(combination: dict, duration, warmup) -> dict:
-    env = {k: str(v) for k, v in combination.items()}
-    env['KRATER_DURATION'] = str(float(duration))
-    env['KRATER_WARMUP'] = str(float(warmup))
-    return env
-
-def parse_result(texts: list[str]) -> dict | None:
-    for text in texts:
-        if text.startswith(BENCH_RESULT_PREFIX):
-            try:
-                result = json.loads(text.removeprefix(BENCH_RESULT_PREFIX))
-                return result if isinstance(result, dict) else None
-            except json.JSONDecodeError:
-                return None
-    return None
-
-def trial_manifest(run: dict, environment: dict, combination: dict) -> dict:
-    trial_vars = trial_env(combination, run['duration'], run['warmup'])
-    return pod.manifest(environment, trial_vars, run)
-
-def run_trial(run: dict, environment: dict, combination: dict, trial_num: int) -> dict:
-    manifest = trial_manifest(run, environment, combination)
-    stop = threading.Event()
-    samples = []
-    times = {}
-    monitor = None
-    failure_reason = None
-
-    try:
-        times["applied"] = pod.start(manifest)
-        container_id = pod.container_id(run['namespace'], run['timeout'])
-        cgroup_path = cgroup.find_cgroup(container_id)
-        missing = cgroup.missing_fields(cgroup_path)
-        monitor = threading.Thread(
-            target = cgroup.sample_until,
-            args = (cgroup_path, missing, run['interval'], stop, samples)
-        )
-        monitor.start()
-        texts = []
-        # the deadline's kill ends the stream a few seconds late
-        # a watchdog that fires first would leave the failure reason empty
-        for stamp, text in pod.stream_logs(run['namespace'], run['timeout'] + 10):
-            texts.append(text)
-            if text in MARKER_TIMES:
-                times[MARKER_TIMES[text]] = stamp
-                sample_at_marker = cgroup.take_sample(cgroup_path, missing)
-                if sample_at_marker is not None:
-                    samples.append(sample_at_marker)
-
-        result = parse_result(texts)
-        if result is None:
-            failure_reason = pod.failure_reason(run['namespace'])
-
-    finally:
-        stop.set()
-        if monitor is not None:
-            monitor.join()
-        pod.delete(run['namespace'])
-
-    # two writers fill samples, the sampler thread and the marker samples
-    # so they arrive out of order
-    samples.sort(key = lambda s: s['timestamp'])
-    entry = { "trial": trial_num,
-              "times": times,
-              "log": texts,
-              "result": result,
-              "samples": samples}
-    if failure_reason is not None:
-        entry['failure_reason'] = failure_reason
-
-    return entry
 
 def user_confirmation() -> bool:
     print('continue? [y/N]\n> ', end='', flush=True, file=sys.stderr)
