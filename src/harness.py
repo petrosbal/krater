@@ -430,10 +430,22 @@ def main() -> None:
         files.append(file)
 
     try:
-        pod.dry_run(trial_manifest(run, selected_envs[0], combinations[0]))
+        phase = pod.phase(run['namespace'])
     except RuntimeError as e:
-        sys.exit(f"Dry run failed with cpu = {run['cpu']}, memory = {run['memory']} in namespace '{run['namespace']}'\n"
-                 f"kubernetes failed with error: {e}")
+        sys.exit(f"can't reach kubernetes: {e}")
+    if phase in ["Pending", "Running"]:
+        sys.exit(f"pod {pod.POD_NAME} is {phase} in namespace '{run['namespace']}', "
+                 "probably another harness running a trial\n"
+                 "wait for it to finish, or if no harness is running, run:\n"
+                 f"kubectl delete pod {pod.POD_NAME} -n {run['namespace']}")
+
+    for env in selected_envs:
+        try:
+            pod.dry_run(trial_manifest(run, env, combinations[0]))
+        except RuntimeError as e:
+            sys.exit(f"Dry run for {env['target']} on {env['runtime_class']} failed with "
+                     f"cpu = {run['cpu']}, memory = {run['memory']} in namespace '{run['namespace']}'\n"
+                     f"kubernetes failed with error: {e}")
 
     pending = pending_trials(files, combinations, run['trials'])
     if pending:

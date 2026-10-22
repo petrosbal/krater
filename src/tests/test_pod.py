@@ -1,5 +1,6 @@
 import pytest
 import pod
+import json
 
 PARSE_LOG_LINE_ROWS = {
     "offset, nine digits": (
@@ -107,3 +108,19 @@ POD_MANIFEST_ROWS = {
 )
 def test_pod_manifest(environment, expected):
     assert pod.manifest(environment, MANIFEST_VARS, MANIFEST_RUN) == expected
+
+def test_dry_run(monkeypatch):
+    calls = []
+    def fake_kubectl(*args, stdin=None):
+        calls.append((args, stdin))
+    monkeypatch.setattr(pod, 'kubectl', fake_kubectl)
+
+    manifest = {'metadata': {'name': 'krater-trial', 'namespace': 'bench'}, 'spec': {}}
+    pod.dry_run(manifest)
+
+    assert len(calls) == 1
+    args, stdin = calls[0]
+    assert args == ('apply', '--dry-run=server', '-f', '-')
+    assert json.loads(stdin)['metadata']['name'] == 'krater-dry-run'
+    assert manifest['metadata']['name'] == 'krater-trial'
+    

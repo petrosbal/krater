@@ -21,6 +21,7 @@ from datetime import datetime
 from collections.abc import Iterator
 
 POD_NAME = "krater-trial"
+DRY_RUN_POD_NAME = "krater-dry-run"
 
 def parse_log_line(line: str) -> tuple[float, str]:
     stamp, text = line.split(' ', maxsplit=1)
@@ -74,7 +75,12 @@ def container_id(namespace: str, timeout: int) -> str:
             "-o", jsonpath).removeprefix("containerd://")
 
 def delete(namespace: str) -> None:
-    kubectl("delete", "pod", POD_NAME, "-n", namespace, "--grace-period=0", "--force", "--ignore-not-found")
+    kubectl("delete", "pod", POD_NAME, "-n", namespace, 
+            "--grace-period=0", "--force", "--ignore-not-found")
+
+def phase(namespace: str) -> str:
+    return kubectl("get", "pod", POD_NAME, "-n", namespace, "-o", 
+                   "jsonpath={.status.phase}", "--ignore-not-found")
 
 def failure_reason(namespace: str) -> str:
     pod_reason = kubectl("get", "pod", POD_NAME, "-n", namespace, 
@@ -101,5 +107,6 @@ def stream_logs(namespace: str, timeout: float) -> Iterator[tuple[float, str]]:
         proc.wait()
 
 def dry_run(manifest: dict) -> None:
-    delete(manifest['metadata']['namespace'])
-    kubectl("apply", "--dry-run=server", "-f", "-", stdin=json.dumps(manifest))
+    metadata = {**manifest['metadata'], 'name': DRY_RUN_POD_NAME}
+    dry_manifest = {**manifest, 'metadata': metadata}
+    kubectl("apply", "--dry-run=server", "-f", "-", stdin=json.dumps(dry_manifest))
