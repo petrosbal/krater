@@ -19,7 +19,9 @@ def mock_config() -> dict:
     }}
 
 def test_blueprint_passes():
-    assert validate(load_config(), ENVIRONMENTS) is None
+    config, problem = load_config()
+    assert problem is None
+    assert validate(config, ENVIRONMENTS) is None
 
 def test_refuses_empty_config():
     assert validate(None, ENVIRONMENTS) == "config is empty or not a valid dict"

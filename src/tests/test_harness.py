@@ -107,7 +107,7 @@ def test_file_for_refuses_a_changed_setting(tmp_path, monkeypatch):
                                      RESULTS_HEADER_ENVIRONMENT)
 
     assert file == None
-    assert problem == ("Existing results file (results/b/krater_matmul_wasm_wasmtime.json) does not match this run:\n"
+    assert problem == ("existing results file (results/b/krater_matmul_wasm_wasmtime.json) does not match this run:\n"
                        "settings:\n"
                        "  file has [('cpu', '999m')]\n"
                        "  config has [('cpu', '500m')]\n"

@@ -146,7 +146,7 @@ def file_for(run: dict, environment: dict) -> tuple[dict | None, str | None]:
     if stored is None:
         return {**header, 'trials': {}}, None
     if (msg := header_mismatch(stored, header)) is not None:
-        return None, (f"Existing results file ({path}) does not match this run:\n"
+        return None, (f"existing results file ({path}) does not match this run:\n"
                       f"{msg}\n"
                       "set the config back, use a new run name, or move the file")
     return stored, None
@@ -412,9 +412,11 @@ def exit_code(stopped: bool, left: int) -> int:
     return 0
 
 def main() -> None:
-    config = load_config()
-    environments = load_environments()
+    config, problem = load_config()
+    if problem is not None:
+        sys.exit(f"config: {problem}")
 
+    environments = load_environments()
     msg = validate(config, environments)
     if msg is not None:
         sys.exit(f"config: {msg}")
@@ -444,15 +446,17 @@ def main() -> None:
         try:
             pod.dry_run(trial_manifest(run, env, combinations[0]))
         except RuntimeError as e:
-            sys.exit(f"Dry run for {env['target']} on {env['runtime_class']} failed with "
+            sys.exit(f"dry run for {env['target']} on {env['runtime_class']} failed with "
                      f"cpu = {run['cpu']}, memory = {run['memory']} in namespace '{run['namespace']}'\n"
-                     f"kubernetes failed with error: {e}")
+                     f"kubernetes error: {e}")
 
     pending = pending_trials(files, combinations, run['trials'])
     if pending:
         print(banner(run, files, combinations, pending), flush=True)
         if not user_confirmation():
             sys.exit("nothing ran")
+    else:
+        print(f"run \"{run['name']}\" is complete, nothing to run")
 
     loop_started = time.time()
     to_rerun, stopped = run_rounds(run, files, combinations, pending, loop_started)

@@ -35,9 +35,12 @@ RUN_KEYS = frozenset({
     "runtimes"
 })
 
-def load_config() -> dict:
+def load_config() -> tuple[dict, str | None]:
     with open(CONFIG_FILE, 'r') as f:
-        return yaml.safe_load(f)
+        try:
+            return yaml.safe_load(f), None
+        except yaml.YAMLError as e:
+            return {}, str(e)
 
 def load_environments() -> list:
     with open(ENVIRONMENTS_FILE, 'r') as f:
@@ -46,6 +49,10 @@ def load_environments() -> list:
 def is_number(value) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
+# yaml keys can be numbers or bools, and sorted() can't compare those with strings
+def name_list(names) -> str:
+    return ', '.join(sorted(map(str, names)))
+
 def select_environments(environments: list, runtimes: list) -> list:
     return [env for env in environments if env['runtime_class'] in runtimes]
 
@@ -53,15 +60,15 @@ def validate(config, environments) -> str | None:
     if not isinstance(config, dict):
         return "config is empty or not a valid dict"
     if unknown := set(config) - {"run"}:
-        return f"unknown top-level keys: {', '.join(sorted(map(str, unknown)))}"
+        return f"unknown top-level keys: {name_list(unknown)}"
     
     run = config.get('run')
     if not isinstance(run, dict):
         return "'run' must be a dict"
     if unknown := run.keys() - RUN_KEYS:
-        return f"'run' has unknown keys: {', '.join(sorted(map(str,unknown)))}"
+        return f"'run' has unknown keys: {name_list(unknown)}"
     if missing := RUN_KEYS - run.keys():
-        return f"'run' missing required keys: {', '.join(sorted(missing))}"
+        return f"'run' missing required keys: {name_list(missing)}"
 
     duration = run['duration']
     if not is_number(duration) or not duration > 0:
@@ -105,8 +112,8 @@ def validate(config, environments) -> str | None:
 
     available = {env['runtime_class'] for env in environments}
     if unknown := set(runtimes) - available:
-        return (f"unknown runtimes detected: {', '.join(sorted(unknown))} "
-                 f"(available runtimes are: {', '.join(sorted(available))})")
+        return (f"unknown runtimes detected: {name_list(unknown)} "
+                 f"(available runtimes are: {name_list(available)})")
 
     return validate_params(run['params'])
 
