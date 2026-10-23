@@ -52,8 +52,11 @@ fi
 # pyyaml check
 if python3 -c "import yaml" 2>/dev/null; then
     printf "  %s[ok]%s pyyaml\n" "${GREEN}" "${RESET}"
+elif [ "$(command -v python3)" = "/usr/bin/python3" ]; then
+    printf "  %s[!!]%s pyyaml         - not found (apt install python3-yaml, dnf install python3-pyyaml or pacman -S python-yaml)\n" "${RED}" "${RESET}"; missing=1
 else
-    printf "  %s[!!]%s pyyaml         - not found (pip install pyyaml)\n" "${RED}" "${RESET}"; missing=1
+    # a conda or pyenv python3 can't see the distro package
+    printf "  %s[!!]%s pyyaml         - not found for %s (pip install pyyaml into it, or put /usr/bin first in PATH)\n" "${RED}" "${RESET}" "$(command -v python3)"; missing=1
 fi
 
 # swipl check
