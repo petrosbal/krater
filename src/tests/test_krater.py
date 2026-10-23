@@ -1,11 +1,11 @@
 import pytest
 
-import harness
+import krater
 import trial
 
 
 def test_param_combinations():
-    value = harness.param_combinations({'size': [5, 10], 'mode': ['a', 'b']})
+    value = krater.param_combinations({'size': [5, 10], 'mode': ['a', 'b']})
     expected = [{'size': 5,  'mode': 'a'},
                 {'size': 5,  'mode': 'b'},
                 {'size': 10, 'mode': 'a'},
@@ -13,7 +13,7 @@ def test_param_combinations():
     assert value == expected
 
 def test_param_combinations_without_params():
-    assert harness.param_combinations({}) == [{}]
+    assert krater.param_combinations({}) == [{}]
 
 def test_run_rounds_stops_properly(monkeypatch, capsys):
     def keyboard_interrupt(run, environment, combination, trial_num):
@@ -25,7 +25,7 @@ def test_run_rounds_stops_properly(monkeypatch, capsys):
     combinations = [{'size': 1024}]
     pending = [(1, files[0], combinations[0])]
     loop_started = 0.0
-    assert harness.run_rounds(run, files, combinations, pending, loop_started) == ([], True)
+    assert krater.run_rounds(run, files, combinations, pending, loop_started) == ([], True)
 
     captured = capsys.readouterr()
     assert captured.out.endswith("size = 1024  \n")
@@ -39,4 +39,4 @@ def test_run_rounds_stops_properly(monkeypatch, capsys):
     (True, 1, 130),
 ])
 def test_exit_code(was_stopped, trials_left, expected):
-    assert harness.exit_code(was_stopped, trials_left) == expected
+    assert krater.exit_code(was_stopped, trials_left) == expected

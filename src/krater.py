@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""harness.py
+"""krater.py
 
 Runs a benchmarking session. The only module that prints, exits or reads stdin.
 """
@@ -49,7 +49,7 @@ def user_confirmation() -> bool:
     try:
         answer = input().strip().lower()
     except EOFError:
-        sys.exit("\nno answer (stdin closed). to run unattended: yes | python3 src/harness.py")
+        sys.exit("\nno answer (stdin closed). to run unattended: yes | python3 src/krater.py")
     return answer in ['y', 'yes']
 
 def run_rounds(run: dict, files: list[dict], combinations: list[dict], pending: list,
