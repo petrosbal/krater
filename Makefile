@@ -4,7 +4,7 @@ IMAGES = $(shell python3 scripts/images.py list)
 RUNWASI_VERSION := 0.6.0
 ARCH            := $(shell uname -m)
 
-.PHONY: help build-images dockerfile-generation remove-images teardown clean-results status setup-wasm teardown-wasm setup-docker run check-deps config
+.PHONY: help build-images dockerfile-generation remove-images teardown clear-results status setup-wasm teardown-wasm setup-docker run check-deps config
 
 BLUE    := \033[1;36m
 GREEN   := \033[1;32m
@@ -33,15 +33,14 @@ setup-docker: ## Set up Docker to run without sudo (needs re-login)
 	sudo usermod -aG docker $(USER)
 	@echo "Done. Log out and back in (or run 'newgrp docker') for the change to take effect."
 
-config: ## Configure benchmark (opens bench_config.yaml in default editor)
-	@$${EDITOR:-nano} src/bench_config.yaml
+config: ## Configure benchmark (opens krater.yaml in default editor)
+	@$${EDITOR:-nano} krater.yaml
 
-run: ## Run the full benchmark suite *
-	sudo python3 src/metaorchestrator.py
-	@if [ -n "$(SUDO_UID)" ]; then chown -R $(SUDO_UID):$(SUDO_GID) results/; fi
+run: ## Run the full benchmark suite
+	python3 src/krater.py
 
-clean-results: ## Remove the results directory contents *
-	sudo rm -rf results/*
+clear-results: ## Remove the results directory contents
+	rm -rf ./results/*
 
 remove-images: ## Remove built images from local Docker and k3s storage
 	docker rmi -f $(IMAGES) || true
@@ -50,7 +49,7 @@ remove-images: ## Remove built images from local Docker and k3s storage
 teardown-wasm: ## Uninstall WASM shim binaries from /usr/local/bin *
 	@sudo bash scripts/teardown-wasm.sh
 
-teardown: remove-images clean-results teardown-wasm ## Remove images, results and WASM shims (full reset)
+teardown: remove-images clear-results teardown-wasm ## Remove images, results and WASM shims (full reset)
 
 help: ## Show this help message
 	@bash scripts/banner.sh

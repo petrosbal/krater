@@ -40,10 +40,10 @@ fi
 if command -v python3 >/dev/null 2>&1; then
     PY_MINOR=$(python3 -c "import sys; print(sys.version_info.minor)" 2>/dev/null)
     PY_MAJOR=$(python3 -c "import sys; print(sys.version_info.major)" 2>/dev/null)
-    if [ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -ge 8 ]; then
-        printf "  %s[ok]%s python 3.%s (≥ 3.8)\n" "${GREEN}" "${RESET}" "${PY_MINOR}"
+    if [ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -ge 10 ]; then
+        printf "  %s[ok]%s python 3.%s (≥ 3.10)\n" "${GREEN}" "${RESET}" "${PY_MINOR}"
     else
-        printf "  %s[!!]%s python3 - 3.8+ required (found 3.%s)\n" "${RED}" "${RESET}" "${PY_MINOR}"; missing=1
+        printf "  %s[!!]%s python3 - 3.10+ required (found 3.%s)\n" "${RED}" "${RESET}" "${PY_MINOR}"; missing=1
     fi
 else
     printf "  %s[!!]%s python3 - not found\n" "${RED}" "${RESET}"; missing=1

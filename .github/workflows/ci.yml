@@ -45,7 +45,3 @@ jobs:
           # DL3059 flags consecutive RUNs because each is a layer that ships.
           # Every RUN here is in a builder stage whose layers are discarded.
           ignore: DL3059
-
-      - name: Validate bench_config.yaml
-        run:
-          python3 -c "import yaml; yaml.safe_load(open('src/bench_config.yaml'))"
