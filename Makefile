@@ -4,7 +4,7 @@ IMAGES = $(shell python3 scripts/images.py list)
 RUNWASI_VERSION := 0.6.0
 ARCH            := $(shell uname -m)
 
-.PHONY: help build-images dockerfile-generation remove-images teardown clear-results status setup-wasm teardown-wasm setup-docker run check-deps config
+.PHONY: help build-images dockerfile-generation remove-images teardown clear-results status setup-wasm teardown-wasm setup-docker run test check-deps config
 
 BLUE    := \033[1;36m
 GREEN   := \033[1;32m
@@ -36,8 +36,11 @@ setup-docker: ## Set up Docker to run without sudo (needs re-login)
 config: ## Configure benchmark (opens krater.yaml in default editor)
 	@$${EDITOR:-nano} krater.yaml
 
-run: ## Run the full benchmark suite
+run: ## Run a full benchmark session
 	python3 src/krater.py
+
+test: ## Run the harness test suite
+	python3 -m pytest src/tests
 
 clear-results: ## Remove the results directory contents
 	rm -rf ./results/*
