@@ -6,6 +6,7 @@ RED=$'\033[1;31m'
 RESET=$'\033[0m'
 
 missing=0
+k3s_reachable=0
 
 printf "\n- DEPENDENCY CHECK -\n"
 printf -- "--------------------------------------------\n"
@@ -30,10 +31,12 @@ else
 fi
 
 # kubectl check
-if command -v kubectl >/dev/null 2>&1; then
-    printf "  %s[ok]%s kubectl\n" "${GREEN}" "${RESET}"
-else
+if ! command -v kubectl >/dev/null 2>&1; then
     printf "  %s[!!]%s kubectl - not found\n" "${RED}" "${RESET}"; missing=1
+elif ! kubectl get --raw /readyz >/dev/null 2>&1; then
+    printf "  %s[!!]%s kubectl - can't reach k3s as %s (is k3s running? KUBECONFIG must point at a readable copy of /etc/rancher/k3s/k3s.yaml)\n" "${RED}" "${RESET}" "${USER}"; missing=1
+else
+    printf "  %s[ok]%s kubectl\n" "${GREEN}" "${RESET}"; k3s_reachable=1
 fi
 
 # python3 and version check
@@ -90,7 +93,9 @@ else
 fi
 
 # runtimeclasses check
-if sudo kubectl get runtimeclass wasmtime wasmedge wasmer >/dev/null 2>&1; then
+if [ "$k3s_reachable" -eq 0 ]; then
+    printf "  %s[!!]%s runtimeclasses - not checked, kubectl can't reach k3s\n" "${RED}" "${RESET}"; missing=1
+elif kubectl get runtimeclass wasmtime wasmedge wasmer >/dev/null 2>&1; then
     printf "  %s[ok]%s runtimeclasses\n" "${GREEN}" "${RESET}"
 else
     printf "  %s[!!]%s runtimeclasses - not found, run: make setup-wasm\n" "${RED}" "${RESET}"; missing=1
