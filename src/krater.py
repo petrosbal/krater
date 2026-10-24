@@ -125,7 +125,10 @@ def main() -> None:
     try:
         phase = pod.phase(run['namespace'])
     except RuntimeError as e:
-        sys.exit(f"can't reach kubernetes: {e}")
+        # kubectl logs every retry before the one line that says what went wrong
+        summary = str(e).splitlines()[-1] if str(e) else ""
+        sys.exit(f"can't reach kubernetes: {summary}\n"
+                 "run make check-deps to see why")
     if phase in ["Pending", "Running"]:
         sys.exit(f"pod {pod.POD_NAME} is {phase} in namespace '{run['namespace']}', "
                  "probably another harness running a trial\n"
