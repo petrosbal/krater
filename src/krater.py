@@ -19,6 +19,7 @@ Runs a benchmarking session. The only module that prints, exits or reads stdin.
 """
 
 import itertools
+import platform
 import sys
 import time
 
@@ -136,6 +137,16 @@ def main() -> None:
             pod.dry_run(trial.manifest(run, env, combinations[0]))
         except RuntimeError as e:
             sys.exit(console.dry_run_refusal_text(run, env, e))
+
+    # the harness reads the pod's cgroup on this machine, so the pod has to fit here
+    # k3s names the node after the hostname
+    node_name = platform.node()
+    try:
+        unrequested = pod.unrequested_on(node_name)
+    except RuntimeError as e:
+        sys.exit(f"can't read node '{node_name}', the one KRATER runs on\nkubernetes error: {e}")
+    if not pod.fits_on(run['cpu'], run['memory'], unrequested):
+        sys.exit(console.fit_refusal_text(run, node_name, unrequested))
 
     pending = results.pending_trials(files, combinations, run['trials'])
     if pending:

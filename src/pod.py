@@ -25,6 +25,7 @@ import threading
 import time
 from collections.abc import Iterator
 from datetime import datetime
+from decimal import Decimal
 
 POD_NAME = "krater-trial"
 DRY_RUN_POD_NAME = "krater-dry-run"
@@ -122,3 +123,46 @@ def dry_run(manifest: dict) -> None:
     metadata = {**manifest['metadata'], 'name': DRY_RUN_POD_NAME}
     dry_manifest = {**manifest, 'metadata': metadata}
     kubectl("apply", "--dry-run=server", "-f", "-", stdin=json.dumps(dry_manifest))
+
+QUANTITY_SUFFIXES = {
+    "n": Decimal("1e-9"), "u": Decimal("1e-6"), "m": Decimal("1e-3"),
+    "k": Decimal(10**3), "M": Decimal(10**6), "G": Decimal(10**9),
+    "T": Decimal(10**12), "P": Decimal(10**15), "E": Decimal(10**18),
+    "Ki": Decimal(2**10), "Mi": Decimal(2**20), "Gi": Decimal(2**30),
+    "Ti": Decimal(2**40), "Pi": Decimal(2**50), "Ei": Decimal(2**60),
+}
+# never rejects or validates input, its only quantities the server accepted
+# (only called after the dry run has succeeded)
+def parse_quantity(quantity: str) -> Decimal:
+    for suffix, factor in QUANTITY_SUFFIXES.items():
+        if quantity.endswith(suffix):
+            number = quantity.removesuffix(suffix)
+            return Decimal(number) * factor
+    return Decimal(quantity)
+
+def fits_on(cpu: str, memory: str, unrequested: dict[str, Decimal]) -> bool:
+    cpu_fits = parse_quantity(cpu) <= unrequested['cpu']
+    memory_fits = parse_quantity(memory) <= unrequested['memory']
+    return cpu_fits and memory_fits
+
+# skips init containers and RuntimeClass overhead, this cluster has neither
+# count them once a cluster does
+def unrequested(allocatable: dict, pods: list) -> dict[str, Decimal]:
+    left = {resource: parse_quantity(allocatable[resource])
+            for resource in ['cpu', 'memory']}
+    for pod in pods:
+        for container in pod['spec']['containers']:
+            requests = container.get('resources', {}).get('requests', {})
+            for resource in ['cpu', 'memory']:
+                left[resource] -= parse_quantity(requests.get(resource, "0"))
+    return left
+
+def non_terminated_pods_on(node_name: str) -> list:
+    selector = f"spec.nodeName={node_name},status.phase!=Succeeded,status.phase!=Failed"
+    pods_json = kubectl("get", "pods", "-A", "--field-selector", selector, "-o", "json")
+    return json.loads(pods_json)['items']
+
+def unrequested_on(node_name: str) -> dict[str, Decimal]:
+    node_json = kubectl("get", "node", node_name, "-o", "json")
+    allocatable = json.loads(node_json)['status']['allocatable']
+    return unrequested(allocatable, non_terminated_pods_on(node_name))

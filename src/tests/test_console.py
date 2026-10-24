@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 import pytest
 
 import console
@@ -90,3 +92,11 @@ BOXED_ROWS = {
 )
 def test_boxed(title, lines, expected):
     assert console.boxed(title, lines) == expected
+
+def test_fit_refusal_text():
+    run = {'cpu': '1000', 'memory': '1024Mi'}
+    unrequested = {'cpu': Decimal('31.8'), 'memory': Decimal(32622604288)}
+    assert console.fit_refusal_text(run, 'msi-pb', unrequested) == (
+        "node msi-pb can't fit cpu = 1000, memory = 1024Mi\n"
+        "it has cpu = 31800m, memory = 31111Mi left unrequested\n"
+        "lower cpu or memory in krater.yaml")

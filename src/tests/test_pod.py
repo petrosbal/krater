@@ -1,4 +1,5 @@
 import json
+from decimal import Decimal
 
 import pytest
 
@@ -36,6 +37,7 @@ PARSE_LOG_LINE_ROWS = {
 )
 def test_parse_log_line(line, expected):
     assert pod.parse_log_line(line) == expected
+
 MANIFEST_RUN = {
     'namespace': 'bench',
     'cpu': '500m',
@@ -125,3 +127,54 @@ def test_dry_run(monkeypatch):
     assert args == ('apply', '--dry-run=server', '-f', '-')
     assert json.loads(stdin)['metadata']['name'] == 'krater-dry-run'
     assert manifest['metadata']['name'] == 'krater-trial'
+
+PARSE_QUANTITY_ROWS = {
+    "plain cores": ("32", Decimal(32)),
+    "millicores": ("1000m", Decimal(1)),
+    "fractional": ("0.5", Decimal("0.5")),
+    "megabytes": ("1M", Decimal(10**6)),
+    "mebibytes": ("1024Mi", Decimal(2**30)),
+    "kibibytes": ("16Ki", Decimal(16 * 1024)),
+    "exponent": ("3E3", Decimal(3 * 1000)),
+    "exabytes": ("6E", Decimal(6 * 10**18)),
+}
+
+@pytest.mark.parametrize("quantity, expected",
+    PARSE_QUANTITY_ROWS.values(), ids=PARSE_QUANTITY_ROWS.keys(),
+)
+def test_parse_quantity(quantity, expected):
+    assert pod.parse_quantity(quantity) == expected
+
+UNREQUESTED = {'cpu': Decimal(2), 'memory': Decimal(2**30)}
+FITS_ON_ROWS = {
+    "exactly full": ("2", "1Gi", True),
+    "one millicore over": ("2001m", "1Gi", False),
+    "one mebibyte over": ("2", "1025Mi", False),
+}
+
+@pytest.mark.parametrize("cpu, memory, expected",
+    FITS_ON_ROWS.values(), ids=FITS_ON_ROWS.keys(),
+)
+def test_fits_on(cpu, memory, expected):
+    assert pod.fits_on(cpu, memory, UNREQUESTED) == expected
+
+def test_unrequested():
+    allocatable = {'cpu': '2', 'memory': '1Gi', 'pods': '110'}
+    pods = [{'spec': {'containers': [{'resources': {'requests': {'cpu': '100m', 'memory': '70Mi'}}},
+                                     {'resources': {'requests': {'cpu': '100m'}}}]}},
+            {'spec': {'containers': [{'resources': {}}, {}]}}]
+    assert pod.unrequested(allocatable, pods) == {'cpu': Decimal('1.8'),
+                                                  'memory': Decimal(2**30 - 70 * 2**20)}
+
+def test_unrequested_on(monkeypatch):
+    calls = []
+    def fake_kubectl(*args):
+        calls.append(args)
+        if args[1] == 'node':
+            return json.dumps({'status': {'allocatable': {'cpu': '2', 'memory': '1Gi'}}})
+        return json.dumps({'items': [{'spec': {'containers': [{'resources': {'requests': {'cpu': '500m'}}}]}}]})
+    monkeypatch.setattr(pod, 'kubectl', fake_kubectl)
+
+    assert pod.unrequested_on('msi-pb') == {'cpu': Decimal('1.5'), 'memory': Decimal(2**30)}
+    assert calls[0][2] == 'msi-pb'
+    assert calls[1][4] == 'spec.nodeName=msi-pb,status.phase!=Succeeded,status.phase!=Failed'

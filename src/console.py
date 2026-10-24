@@ -22,6 +22,7 @@ block. Prints absolutely nothing.
 import platform
 from collections import Counter
 from datetime import datetime, timedelta
+from decimal import Decimal
 
 import results
 from config import CONFIG_FILE, RUNNER_SLEEP, RUNNER_TAIL_SLEEP
@@ -167,3 +168,9 @@ def dry_run_refusal_text(run: dict, environment: dict, error: RuntimeError) -> s
     return (f"dry run for {environment['target']} on {environment['runtime_class']} failed with "
             f"cpu = {run['cpu']}, memory = {run['memory']} in namespace '{namespace}'\n"
             f"kubernetes error: {error}{hint}")
+
+def fit_refusal_text(run: dict, node_name: str, unrequested: dict[str, Decimal]) -> str:
+    return (f"node {node_name} can't fit cpu = {run['cpu']}, memory = {run['memory']}\n"
+            f"it has cpu = {int(unrequested['cpu'] * 1000)}m, "
+            f"memory = {int(unrequested['memory'] / 2**20)}Mi left unrequested\n"
+            f"lower cpu or memory in {CONFIG_FILE}")
