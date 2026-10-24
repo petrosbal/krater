@@ -15,12 +15,13 @@ RESET   := \033[0m
 
 all: help
 
-build-images: ## Build all targets and import to k3s *
+build-images: dockerfile-generation ## Build all targets and import to k3s *
 	python3 scripts/images.py build
 	@echo "Importing to k3s..."
-	@bash -o pipefail -c 'docker save $(IMAGES) | sudo k3s ctr images import - > /dev/null'
+# the list is read here, after dockerfile-generation, not when make parses this file
+	@bash -o pipefail -c 'docker save $$(python3 scripts/images.py list) | sudo k3s ctr images import - > /dev/null'
 
-dockerfile-generation: ## Generate dice/generated/ from build.yaml *
+dockerfile-generation: ## Generate dice/generated/ from krater.yaml *
 	@swipl dice/main.pl --arch=$(ARCH)
 
 check-deps: ## Check all required tools are installed
@@ -36,11 +37,11 @@ setup-docker: ## Set up Docker to run without sudo (needs re-login)
 config: ## Configure benchmark (opens krater.yaml in default editor)
 	@$${EDITOR:-nano} krater.yaml
 
-run: ## Run a full benchmark session
+run: dockerfile-generation ## Run a full benchmark session
 	python3 src/krater.py
 
 test: ## Run the harness test suite
-	python3 -m pytest src/tests
+	python3 -m pytest -q src/tests
 
 clear-results: ## Remove the results directory contents
 	rm -rf ./results/*

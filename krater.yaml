@@ -1,3 +1,25 @@
+build:
+  workload:
+    language: c
+    source: workloads/matmul/matmul.c
+    optimization_level: 3
+
+  targets:
+    - name: native
+      code_format: native
+      link_mode: dynamic
+
+    - name: native-static
+      code_format: native
+      link_mode: static
+
+    - name: wasm
+      code_format: wasm
+
+    - name: wasm-aot
+      code_format: wasm
+      aot_compiler: wasmedge
+
 run:
   runtimes: [default, wasmtime, wasmedge, wasmer]
   params:

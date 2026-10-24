@@ -66,7 +66,8 @@ def select_environments(environments: list, runtimes: list) -> list:
 def validate(config, environments) -> str | None:
     if not isinstance(config, dict):
         return "config is empty or not a valid dict"
-    if unknown := set(config) - {"run"}:
+    # build is DICE's section, the harness never reads it
+    if unknown := set(config) - {"run", "build"}:
         return f"unknown top-level keys: {name_list(unknown)}"
 
     run = config.get('run')

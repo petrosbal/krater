@@ -2,7 +2,7 @@
 
 ## Overview
 
-DICE is the SWI-Prolog generator behind KRATER's images. It reads `build.yaml` and derives two files from it:
+DICE is the SWI-Prolog generator behind KRATER's images. It reads the `build` section of `krater.yaml` and derives two files from it:
 
 * **generated/Dockerfile**: One multi-stage build for every target.
 * **generated/available_environments.yaml**: Every target paired with each runtime class it may run under, plus the image it runs in.
@@ -26,35 +26,34 @@ Requires SWI-Prolog with `library(yaml)` and `library(pcre)`. `make check-deps` 
 ## Configuration
 
 ```yaml
-# build.yaml
-workload:
-  language: c
-  source: workloads/matmul/matmul.c
-
+# krater.yaml
 build:
-  optimization_level: 3
+  workload:
+    language: c
+    source: workloads/matmul/matmul.c
+    optimization_level: 3
 
-targets:
-  - name: native
-    code_format: native
-    link_mode: dynamic
+  targets:
+    - name: native
+      code_format: native
+      link_mode: dynamic
 
-  - name: native-static
-    code_format: native
-    link_mode: static
+    - name: native-static
+      code_format: native
+      link_mode: static
 
-  - name: wasm
-    code_format: wasm
+    - name: wasm
+      code_format: wasm
 
-  - name: wasm-aot
-    code_format: wasm
-    aot_compiler: wasmedge
+    - name: wasm-aot
+      code_format: wasm
+      aot_compiler: wasmedge
 ```
 
-* `workload.language`: `c` or `rust`.
-* `workload.source`: A relative path. Its filename without the extension names every artifact and image.
-* `build.optimization_level`: `0` to `3`, translated into each toolchain's own flag syntax.
-* `targets`: A non-empty list. Every target needs a unique `name` and a `code_format`.
+* `build.workload.language`: `c` or `rust`.
+* `build.workload.source`: A relative path. Its filename without the extension names every artifact and image.
+* `build.workload.optimization_level`: `0` to `3`, translated into each toolchain's own flag syntax.
+* `build.targets`: A non-empty list. Every target needs a unique `name` and a `code_format`.
   * `name`: Lowercase letters and digits, separated by `.`, `_`, `__` or `-`.
   * `code_format`: `native` or `wasm`.
   * `link_mode`: `dynamic` or `static`. Required for `native`, refused for `wasm`.
@@ -100,7 +99,7 @@ Each cause gets its own line. If none of the known causes match, DICE says that 
 ## Modules
 
 * **main.pl**: Reads the options, loads the facts, calls both writers, and turns a refusal into a message and exit code 1.
-* **config_reader.pl**: Reads and validates `build.yaml` and returns the facts.
+* **config_reader.pl**: Reads and validates the `build` section of `krater.yaml` and returns the facts.
 * **build_facts.pl**: Holds the facts.
 * **derivation.pl**: Derives the toolchains, steps, stage order, filenames and image names.
 * **runtime_compatibility.pl**: Pairs each target with the runtime classes it may run under.

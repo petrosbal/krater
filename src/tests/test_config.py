@@ -29,8 +29,13 @@ def test_refuses_empty_config():
 
 def test_refuses_unknown_top_level_key():
     config = mock_config()
+    config['rnu'] = {}
+    assert validate(config, ENVIRONMENTS) == "unknown top-level keys: rnu"
+
+def test_accepts_dice_build_section():
+    config = mock_config()
     config['build'] = {}
-    assert validate(config, ENVIRONMENTS) == "unknown top-level keys: build"
+    assert validate(config, ENVIRONMENTS) is None
 
 def test_refuses_run_not_a_dict():
     config = mock_config()

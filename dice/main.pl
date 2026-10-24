@@ -47,7 +47,8 @@ generate(Argv):-
     argv_options(Argv, Positional, Options),
     call_or_throw(Positional == [], unexpected_arguments(Positional)),
     call_or_throw(option(architecture(Architecture), Options), no_architecture),
-    call_or_throw(load_build_facts('build.yaml', Architecture), rejected_config),
+    call_or_throw(load_build_facts(
+        'krater.yaml', Architecture), rejected_config),
     call_or_throw(write_dockerfile('dice/generated/Dockerfile'), underivable),
     call_or_throw(write_environments(
         'dice/generated/available_environments.yaml'), underivable).

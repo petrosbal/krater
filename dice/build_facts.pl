@@ -17,7 +17,7 @@
 
 % ==============================================================================
 %!  config_predicate(Predicate).
-%       Every predicate whose facts come from build.yaml. One table declares
+%       Every predicate whose facts come from krater.yaml. One table declares
 %       them dynamic, clears them on a reload, and says which facts may be
 %       asserted. architecture/1 is absent because it comes from the command
 %       line.

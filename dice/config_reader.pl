@@ -1,7 +1,8 @@
 %%% config_reader.pl
 %%%
-%%% Reads build.yaml, validates it, and returns its content as facts.
-%%% Asserts nothing, so a rejected config leaves the fact base untouched.
+%%% Reads the build section of krater.yaml, validates it, and returns its
+%%% content as facts. Asserts nothing, so a rejected config leaves the fact
+%%% base untouched.
 
 :- module(config_reader, [read_config/2]).
 :- use_module(library(apply), [maplist/3]).
@@ -14,18 +15,17 @@
 %!  required_key(Section, Key).
 %       The keys a section must contain. Everything in allowed_key/2 but not
 %       here is optional.
-required_key(config, workload).
-required_key(config, build).
-required_key(config, targets).
+required_key(build, workload).
+required_key(build, targets).
 required_key(target, name).
 required_key(target, code_format).
 required_key(workload, language).
 required_key(workload, source).
-required_key(build, optimization_level).
+required_key(workload, optimization_level).
 
 % ==============================================================================
 %!  allowed_key(Section, Key).
-%       Every key a section of build.yaml may contain. Anything else is a typo.
+%       Every key a section of krater.yaml may contain. Anything else is a typo.
 %       The facts are the optional keys. The rule adds every required key.
 allowed_key(target, link_mode).
 allowed_key(target, aot_compiler).
@@ -58,7 +58,7 @@ missing_keys(Section, SectionDict, MissingKeysList):-
 %       accepts any value.
 key_pattern(target,   name,   "^[a-z][a-z0-9]*(?:(?:[._]|__|-+)[a-z0-9]+)*\\z").
 key_pattern(workload, source,               "^[A-Za-z0-9_][A-Za-z0-9._/-]*\\z").
-key_pattern(build,    optimization_level,                          "^[0-3]\\z").
+key_pattern(workload, optimization_level,                          "^[0-3]\\z").
 
 % ==============================================================================
 %!  malformed_values(Section, SectionDict, MalformedValueKeysList).
@@ -88,9 +88,8 @@ value_shape(Value, scalar):-
 % ==============================================================================
 %!  key_shape(Section, Key, Shape).
 %       The keys whose value is not a scalar. A key with no row here is scalar.
-key_shape(config, workload, mapping).
-key_shape(config, build, mapping).
-key_shape(config, targets, list).
+key_shape(build, workload, mapping).
+key_shape(build, targets, list).
 
 % ==============================================================================
 %!  key_expected_shape(Section, Key, Shape).
@@ -193,16 +192,13 @@ valid_target_names(_):-
 
 % ==============================================================================
 %!  valid_config(Config).
-%       Succeeds when every section of a parsed build.yaml is valid.
+%       Succeeds when the build section and every section in it is valid.
 %       Otherwise reports what is wrong and fails.
 valid_config(Config):-
-    valid_section(config, Config),
+    valid_section(build, Config),
 
     get_dict(workload, Config, Workload),
     valid_section(workload, Workload),
-
-    get_dict(build, Config, Build),
-    valid_section(build, Build),
 
     get_dict(targets, Config, Targets),
     valid_targets(Targets),
@@ -243,23 +239,17 @@ targets_section_facts(Config, Facts):-
 
 % ==============================================================================
 %!  workload_section_facts(Config, Facts).
-%       Succeeds when Facts is what the workload section declares. Both keys
-%       get a prefix the YAML doesn't have, for clarity.
+%       Succeeds when Facts is what the workload section declares. Language
+%       and source get a prefix the YAML doesn't have, for clarity.
 workload_section_facts(Config, Facts):-
     get_dict(workload, Config, Workload),
     get_dict(language, Workload, LanguageString),
     atom_string(Language, LanguageString),
     get_dict(source, Workload, SourceString),
     atom_string(Source, SourceString),
-    Facts = [workload_language(Language), workload_source(Source)].
-
-% ==============================================================================
-%!  build_section_facts(Config, Facts).
-%       Succeeds when Facts is what the build section declares.
-build_section_facts(Config, Facts):-
-    get_dict(build, Config, Build),
-    get_dict(optimization_level, Build, Level),
-    Facts = [optimization_level(Level)].
+    get_dict(optimization_level, Workload, Level),
+    Facts = [workload_language(Language), workload_source(Source),
+             optimization_level(Level)].
 
 % ==============================================================================
 %!  parsed_config(Path, Config).
@@ -271,13 +261,27 @@ parsed_config(Path, Config):-
             fail )).
 
 % ==============================================================================
+%!  build_section(Path, File, Config).
+%       Succeeds when Config is the build section of the parsed file at Path.
+%       Otherwise reports it missing and fails. The other sections belong to
+%       the harness, so they're never looked at.
+build_section(_, File, Config):-
+    is_dict(File),
+    get_dict(build, File, Config),
+    !.
+
+build_section(Path, _, _):-
+    report_keys(Path, 'missing keys', [build]),
+    fail.
+
+% ==============================================================================
 %!  read_config(Path, Facts).
 %       Reads the file at Path and returns the facts it declares. Fails if the
 %       file does not pass valid_config/1, so a bad file can't load half-way.
 read_config(Path, Facts):-
-    parsed_config(Path, Config),
+    parsed_config(Path, File),
+    build_section(Path, File, Config),
     valid_config(Config),
     workload_section_facts(Config, WorkloadFacts),
-    build_section_facts(Config, BuildFacts),
     targets_section_facts(Config, TargetsFacts),
-    append([WorkloadFacts, BuildFacts, TargetsFacts], Facts).
+    append([WorkloadFacts, TargetsFacts], Facts).

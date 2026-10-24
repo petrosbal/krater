@@ -87,7 +87,7 @@ render_stage(OutStream, final(Target)):-
 %       Renders the two comments that say not to edit the file by hand.
 render_header(OutStream):-
     format(OutStream,
-   "# Automatically generated from build.yaml with the power of Prolog.~n", []),
+  "# Automatically generated from krater.yaml with the power of Prolog.~n", []),
     format(OutStream, "# You probably don't want to edit this file.~n", []).
 
 % ==============================================================================
