@@ -1,11 +1,11 @@
 # Results
 
-Each environment gets one JSON file, `results/<name>/krater_<workload>_<target>_<runtime>.json`, for instance `results/benchmark_1/krater_matmul_native_default.json`. `<name>` is `run.name` in `krater.yaml`.
+Each environment gets one JSON file, `results/<name>/krater_<workload>_<target>_<runtime>.json`, for instance `results/demo/krater_matmul_native_default.json`. `<name>` is `run.name` in `krater.yaml`.
 
 ```
 {
   "environment": {"target": "native", "image": "krater:matmul_native", "runtime_class": "default"},
-  "settings": {"duration": 60, "warmup": 10, "timeout": 120, "cpu": "1000m", "memory": "1024Mi", "interval": 0.2},
+  "settings": {"duration": 5, "warmup": 0, "timeout": 120, "cpu": "1000m", "memory": "1024Mi", "interval": 0.2},
   "trials": {
     "size = 256": [
       {

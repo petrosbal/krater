@@ -24,7 +24,7 @@ The full API is described at the top of [src/workload_runner.h](../src/workload_
 
 1. Set `build.workload.source` in `krater.yaml` to the new file.
 2. Run `make build-images`, then `make status`.
-3. For a first run, set `trials: 1`, a short `duration`, `warmup: 0` and a new `name`.
+3. Set `run.params` to the workload's parameters, and pick a new `run.name`.
 4. Run `make run`.
 
 The metrics are in each trial's `result`, under `results/<name>/`, described in [docs/RESULTS.md](../docs/RESULTS.md).

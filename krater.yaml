@@ -24,13 +24,13 @@ build:
 run:
   runtimes: [default, wasmtime, wasmedge, wasmer]
   params:
-    size: [256, 1024]
-  trials: 30
-  duration: 60
-  warmup: 10
+    size: [64, 256]
+  trials: 1
+  duration: 5
+  warmup: 0
   timeout: 120
   interval: 0.2
   namespace: default
   cpu: "1000m"
   memory: "1024Mi"
-  name: benchmark_1
+  name: demo
