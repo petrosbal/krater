@@ -27,4 +27,4 @@ The full API is described at the top of [src/workload_runner.h](../src/workload_
 3. For a first run, set `trials: 1`, a short `duration`, `warmup: 0` and a new `name`.
 4. Run `make run`.
 
-The metrics are in each trial's `result`, under `results/<name>/`.
+The metrics are in each trial's `result`, under `results/<name>/`, described in [docs/RESULTS.md](../docs/RESULTS.md).
