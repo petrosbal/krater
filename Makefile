@@ -21,7 +21,7 @@ build-images: dockerfile-generation ## Build all targets and import to k3s *
 # the list is read here, after dockerfile-generation, not when make parses this file
 	@bash -o pipefail -c 'docker save $$(python3 scripts/images.py list) | sudo k3s ctr images import - > /dev/null'
 
-dockerfile-generation: ## Generate dice/generated/ from krater.yaml *
+dockerfile-generation: ## Build dice/generated/ from krater.yaml
 	@swipl dice/main.pl --arch=$(ARCH)
 
 check-deps: ## Check all required tools are installed
@@ -62,19 +62,19 @@ help: ## Show this help message
 	@echo  "-----------------------------------------------------------"
 	@echo  ""
 	@echo  "Setup"
-	@grep -E '^[a-zA-Z_-]+:.*?## (Check|Set up).*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(MAGENTA)%-20s$(RESET) %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z_-]+:.*?## (Check|Set up).*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(MAGENTA)%-22s$(RESET) %s\n", $$1, $$2}'
 	@echo  ""
 	@echo  "Build & Deployment"
-	@grep -E '^[a-zA-Z_-]+:.*?## Build.*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(BLUE)%-20s$(RESET) %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z_-]+:.*?## Build.*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(BLUE)%-22s$(RESET) %s\n", $$1, $$2}'
 	@echo  ""
 	@echo  "Benchmark"
-	@grep -E '^[a-zA-Z_-]+:.*?## (Configure|Run).*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(GREEN)%-20s$(RESET) %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z_-]+:.*?## (Configure|Run).*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(GREEN)%-22s$(RESET) %s\n", $$1, $$2}'
 	@echo  ""
 	@echo  "Cleanup & Maintenance"
-	@grep -E '^[a-zA-Z_-]+:.*?## (Remove|Uninstall).*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(RED)%-20s$(RESET) %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z_-]+:.*?## (Remove|Uninstall).*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(RED)%-22s$(RESET) %s\n", $$1, $$2}'
 	@echo  ""
 	@echo  "Information"
-	@grep -E '^[a-zA-Z_-]+:.*?## Show.*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(YELLOW)%-20s$(RESET) %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z_-]+:.*?## Show.*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(YELLOW)%-22s$(RESET) %s\n", $$1, $$2}'
 	@echo  ""
 	@echo  "* requires sudo"
 	@echo  ""
