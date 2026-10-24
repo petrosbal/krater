@@ -101,5 +101,9 @@ else
     printf "  %s[!!]%s runtimeclasses - not found, run: make setup-wasm\n" "${RED}" "${RESET}"; missing=1
 fi
 
+if [ "$missing" -eq 0 ]; then
+    printf "\nnext: make build-images\n"
+fi
+
 printf "\n"
 exit $missing

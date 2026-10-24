@@ -20,6 +20,7 @@ build-images: dockerfile-generation ## Build all targets and import to k3s *
 	@echo "Importing to k3s..."
 # the list is read here, after dockerfile-generation, not when make parses this file
 	@bash -o pipefail -c 'docker save $$(python3 scripts/images.py list) | sudo k3s ctr images import - > /dev/null'
+	@echo "next: make status"
 
 dockerfile-generation: ## Build dice/generated/ from krater.yaml
 	@swipl dice/main.pl --arch=$(ARCH)
