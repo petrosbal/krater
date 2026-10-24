@@ -25,41 +25,7 @@ Requires SWI-Prolog with `library(yaml)` and `library(pcre)`. `make check-deps` 
 
 ## Configuration
 
-```yaml
-# krater.yaml
-build:
-  workload:
-    language: c
-    source: workloads/matmul/matmul.c
-    optimization_level: 3
-
-  targets:
-    - name: native
-      code_format: native
-      link_mode: dynamic
-
-    - name: native-static
-      code_format: native
-      link_mode: static
-
-    - name: wasm
-      code_format: wasm
-
-    - name: wasm-aot
-      code_format: wasm
-      aot_compiler: wasmedge
-```
-
-* `build.workload.language`: `c` or `rust`.
-* `build.workload.source`: A relative path. Its filename without the extension names every artifact and image.
-* `build.workload.optimization_level`: `0` to `3`, translated into each toolchain's own flag syntax.
-* `build.targets`: A non-empty list. Every target needs a unique `name` and a `code_format`.
-  * `name`: Lowercase letters and digits, separated by `.`, `_`, `__` or `-`.
-  * `code_format`: `native` or `wasm`.
-  * `link_mode`: `dynamic` or `static`. Required for `native`, refused for `wasm`.
-  * `aot_compiler`: `wasmedge`. Only for a C `wasm` target.
-
-Unknown/missing keys and malformed/misshapen values are refused, with the offending key named.
+The `build` keys are described in [docs/CONFIGURATION.md](../docs/CONFIGURATION.md).
 
 ## Supported builds
 
@@ -95,6 +61,17 @@ cannot derive a Dockerfile:
 ```
 
 Each cause gets its own line. If none of the known causes match, DICE says that too.
+
+## Extending
+
+Each extension is a set of fact rows. Then run `make dockerfile-generation`, which names most missing rows.
+
+| Extension | File | Fact rows | Notes |
+|---|---|---|---|
+| Language | `derivation.pl` | One `language_toolchain` per code format. Per new toolchain: `builder_image`, `toolchain_binary`, `optimization_syntax`, `stage_setup`, plus `toolchain_flag` and `modifier_flag` if it uses them. | To run as a workload, it also needs a runner, named in `language_runner`. |
+| AOT compiler | `derivation.pl`, `runtime_compatibility.pl` | `toolchain_supports(<wasm toolchain>, aot_compiler, <compiler>)`, the compiler's own toolchain rows, and `aot_runtime` naming the runtime class that runs its output. A downloaded compiler also needs `toolchain_release`, `toolchain_asset`, `toolchain_archive` and `toolchain_url`. | `aot_runtime` is what pairs the target with its runtime. The compile command follows WasmEdge's `compile` form. |
+| Wasm runtime | `runtime_compatibility.pl` | `wasm_shim` | The shim also goes in `scripts/setup-wasm.sh`, `teardown-wasm.sh` and `check-deps.sh`, and its name in `run.runtimes`. k3s creates a RuntimeClass for the shims it detects, check with `kubectl get runtimeclass`. |
+| Architecture | `derivation.pl` | `toolchain_asset` for every downloaded toolchain. | `make` passes `uname -m` as `--arch`. The builder images and shims need a build for it too. |
 
 ## Modules
 

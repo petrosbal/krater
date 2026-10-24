@@ -1,3 +1,4 @@
+# every key is described in docs/CONFIGURATION.md
 build:
   workload:
     language: c
