@@ -14,7 +14,7 @@ curl -sfL https://get.k3s.io | sh -s - --write-kubeconfig-mode 644
 
 `--write-kubeconfig-mode 644` lets `kubectl` reach k3s without `sudo`.
 
-Then let Docker run without `sudo`, and log out and back in:
+Then let Docker run without `sudo`, and reboot:
 
 ```bash
 make setup-docker
