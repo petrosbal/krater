@@ -2,297 +2,60 @@
 ## Kubernetes Runtime Analysis Tool for Empirical Research
 
 ![License](https://img.shields.io/badge/License-GPLv3-gold)
-![Status](https://img.shields.io/badge/Status-Public_Repo-darkblue)
 
 ![C](https://img.shields.io/badge/Language-C-A8B9CC?style=flat&logo=c&logoColor=white)
 ![Python](https://img.shields.io/badge/Language-Python-3776AB?style=flat&logo=python&logoColor=white)
+![SWI-Prolog](https://img.shields.io/badge/Language-SWI--Prolog-0A3D6C?style=flat)
 ![K3s](https://img.shields.io/badge/Orchestrator-K3s-FF401C?style=flat&logo=kubernetes&logoColor=white)
 ![Wasm](https://img.shields.io/badge/WASM-624fe8?logo=webassembly&logoColor=white)
 
-![Cgroup Monitoring](https://img.shields.io/badge/Monitoring-cgroups_v2%20-success)
-
 ## Overview
 
-A benchmarking framework for comparing WebAssembly and Linux container runtime environments in K3s, with complete automation, runtime-agnostic cgroup v2 monitoring, per-trial measurement gating and checkpoint-based resumability.
-
-## Project Structure
-
-* Source code (`src/`):
-
-    * **workload_runner.h**: Runner for C workloads. Defines `main()`, the timed loop and the single `BENCH_RESULT` JSON line. A workload includes it as a header.
-
-    * **single_env_orch.py**: A Python orchestrator that handles pod deployment, log parsing, and cgroup resource monitoring for a single execution environment.
-
-    * **metaorchestrator.py**: The main benchmarking script. Coordinates a benchmark suite across multiple execution environments. It is configured exclusively by `bench_config.yaml`.
-
-    * **bench_config.yaml**: Single source of truth for benchmark configuration - environments, matrix sizes, trial count, duration, warmup, cgroup sample interval, and output subfolder.
-
-* Workloads (`workloads/`):
-
-    * **matmul/matmul.c**: Standard matrix multiplication with validity check. Reports throughput in MFLOPS.
-
-* **dice/generated/Dockerfile**: Multi-stage build file, generated from `build.yaml`, defining four targets:
-    * `native`: GCC, dynamically linked (Debian Slim)
-    * `native-static`: GCC, statically linked (Scratch)
-    * `wasm`: WebAssembly build using WASI SDK (Scratch)
-    * `wasm-aot`: AOT-compiled WASM via `wasmedge compile` (Universal WASM format, Scratch)
-
-* **Makefile**: Manages the full project lifecycle - dependency checking, WASM shim setup, image building, running the benchmark suite, and cleanup.
-
-* **scripts/**: Shell scripts backing the complex Makefile targets (`check-deps.sh`, `setup-wasm.sh`, `teardown-wasm.sh`, `status.sh`).
-
-
-## Prerequisites
-
-- Linux with root access and cgroup v2 (`/sys/fs/cgroup`)
-- [K3s](https://k3s.io/) ≥ v1.34 with containerd
-- Docker ≥ v24 (BuildKit enabled)
-- `kubectl` configured for K3s (`KUBECONFIG=/etc/rancher/k3s/k3s.yaml`)
-- Python ≥ 3.8 with `pyyaml` (`pip install pyyaml`)
-- [runwasi](https://github.com/containerd/runwasi) v0.6.0 shim binaries (installed via `make setup-wasm`)
-
-## Installation & Setup
-
-### 0. Install system dependencies
-
-**Docker:**
-```bash
-curl -fsSL https://get.docker.com | sudo sh
-```
-
-**K3s** (also installs containerd and kubectl):
-```bash
-curl -sfL https://get.k3s.io | sh -
-```
-
-### 1. Allow Docker without sudo (optional, needs re-login)
-
-```bash
-make setup-docker
-```
-
-### 2. Verify dependencies
-
-```bash
-make check-deps
-```
-
-### 3. Set up WASM support
-
-Downloads [runwasi](https://github.com/containerd/runwasi) v0.6.0 shim binaries for `wasmtime`, `wasmedge`, and `wasmer`, installs them to `/usr/local/bin/`, and restarts K3s. K3s auto-detects the binaries on startup and registers them with containerd.
-
-```bash
-make setup-wasm
-```
-
-### 4. Build and import images
-
-```bash
-make build-images
-```
+KRATER benchmarks WebAssembly against native Linux containers on Kubernetes. It builds one workload as native and Wasm images, runs each image in k3s under every runtime that can run it, and records the workload's own metrics alongside the pod's CPU and memory use from cgroup v2. `krater.yaml` describes what to build and how to run it, and DICE, KRATER's SWI-Prolog generator, derives the build from it.
 
 ```mermaid
-flowchart TD
-    Root[make image-build]
-
-    subgraph DebianFlow [Native]
-        direction TB
-        DebBuild[build native image]
+flowchart LR
+    subgraph config [krater.yaml]
+        b["build:"]
+        r["run:"]
     end
-
-    subgraph StaticFlow [Native static]
-        direction TB
-        StatBuild[build native-static image]
-    end
-
-    subgraph WasmFlow [WASM]
-        direction TB
-        WasmBuild[build WASM image]
-    end
-
-    subgraph WasmAotFlow [WASM AOT]
-        direction TB
-        WasmAotBuild[build AOT WASM image]
-    end
-
-    Import[import to k3s containerd]
-
-    %% Connections
-    Root --> DebianFlow
-    Root --> StaticFlow
-    Root --> WasmFlow
-    Root --> WasmAotFlow
-
-    %% Converge to single import step
-    DebBuild --> Import
-    StatBuild --> Import
-    WasmBuild --> Import
-    WasmAotBuild --> Import
+    b --> dice[DICE] --> images[images] --> harness[harness] --> results["results/"]
+    r --> harness
 ```
-Creates `krater:native`, `krater:native-static`, `krater:wasm`, `krater:wasm-aot` and imports them into the K3s containerd registry.
 
-Verify all images are present in both Docker and K3s:
+## Quick start
+
+KRATER runs on a single Linux machine with cgroup v2, sudo and k3s, and `make check-deps` checks the tools it needs. [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md) installs the tools and walks through each command.
+
 ```bash
+make setup-docker   # then reboot
+make check-deps
+make build-images
 make status
-```
-
-### Cleanup
-
-- `make remove-images` - remove project images from Docker and K3s
-- `make clean-results` - delete the contents of `results/`
-- `make teardown` - full reset: removes images, results, and WASM shims
-
-## Usage
-
-To edit the benchmark configuration before running:
-```bash
-make config
-```
-
-```bash
 make run
 ```
 
-*Root privileges are required to read from `/sys/fs/cgroup`.*
+`make run` starts the short demo in `krater.yaml`, and `make help` lists every target.
 
-The `metaorchestrator.py` script automates the benchmarking process across many environments by executing `single_env_orch.py` for each image in `bench_config.yaml`, using the shared arguments defined below them.
+## Documentation
 
-These are the pre-defined parameters of the benchmark suite:
+| Document | When to read it |
+|---|---|
+| [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md) | Before the first run. |
+| [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | Before editing `krater.yaml`. |
+| [docs/RESULTS.md](docs/RESULTS.md) | Before reading a results file. |
+| [workloads/README.md](workloads/README.md) | Before benchmarking your own workload. |
+| [dice/DICE.md](dice/DICE.md) | Before extending DICE or reading what it generates. |
 
+## Repository layout
 
-```
-environments:
-  - image: krater:native
-    runtime_class: default
+* **krater.yaml**: The config.
+* **src/**: The Python harness and the C workload runner.
+* **dice/**: DICE and the files it generates, in `dice/generated/`.
+* **workloads/**: The workloads, one folder each.
+* **docs/**: The guides.
+* **scripts/**: The scripts the make targets and CI run.
 
-  - image: krater:native-static
-    runtime_class: default
+## Licence
 
-  - image: krater:wasm
-    runtime_class: wasmtime
-
-  - image: krater:wasm
-    runtime_class: wasmedge
-
-  - image: krater:wasm
-    runtime_class: wasmer
-
-  - image: krater:wasm-aot
-    runtime_class: wasmedge
-
-
-shared_args:
-  sizes: [256, 1024]
-  trials: 30
-  duration: 30
-  warmup: true
-  interval: 0.5
-  namespace: default
-  cpu: "1000m"
-  memory: "1024Mi"
-  results_subfolder_name: test_bench
-```
-
-## Dataset
-
-The raw benchmark datasets used in this thesis are publicly available on Zenodo:
-**https://doi.org/10.5281/zenodo.20600481**
-
-## Output Results
-
-```mermaid
----
-config:
-  look: classic
-  theme: redux-dark
----
-flowchart TB
- subgraph DataSources["Data Sources"]
-        PodLogs["workload output 
-        (via kubectl logs)"]
-        Cgroups["cgroup filesystem 
-        (/sys/fs/cgroup)"]
-  end
- subgraph Host[" "]
-  direction BT
-        Orchestrator[("Orchestrator")]
-        DataSources
-  end
-    PodLogs -- Iterations, MFLOPS, Validity --> Orchestrator
-    Cgroups -- CPU Usage, Memory, Throttling --> Orchestrator
-```
-
-The results are saved under `results/<subfolder>/` (where `<subfolder>` is `results_subfolder_name` from the config), with one `.json` file per execution environment. Each entry is keyed as `<size>_w` (with warmup) or `<size>_nw` (without warmup) and contains:
-
-### 1. Phases (Timestamps)
-
-Lifecycle events, recorded as Unix timestamps:
-
-* `start`: Deployment trigger time
-* `running_time`: Pod reached `Running` state
-* `bench_start`: The moment the C application prints `BENCH_START` (after optional warmup).
-* `end`: The moment the C application prints `BENCH_END`.
-
-```mermaid
----
-config:
-  theme: mc
----
-gantt
-    title Trial execution flow
-    dateFormat X
-    axisFormat %
-
-    section Orchestrator
-    apply & wait                 :orch1, 0, 2
-    logs streaming               :orch3, after orch1, 7s
-    cgroup monitor thread active :crit, orch4, after ben2, 4s
-    save / cleanup               :orch5, after ben4, 1s
-
-    section Pod Status
-    ContainerCreating            :pod1, 0, 2
-    Running                      :pod2, after pod1, 7s
-    Terminating                  :pod3, after pod2, 1s
-    
-    section App (workload)
-    init                         :ben1, after pod1, 1s
-    warmup (5s)                  :ben2, after ben1, 1s
-    workload loop                :crit, ben3, after ben2, 4s
-    validation & exit            :ben4, after ben3, 1s
-
-    section Timestamps
-    start                        :milestone, m0, 0, 0s
-    running_time                 :milestone, m1, after pod1, 0s
-    bench_start                  :milestone, m2, after ben2, 0s
-    ‎ end                 :milestone, m3, after ben3, 0s
-```
-
-### 2. Parsed Metrics (C Application Log)
-
-Metrics extracted directly from the C application's standard output:
-
-* `iterations`: Total matrix multiplications completed.
-* `throughput_mflops`: Speed in MFLOPS.
-* `valid`: `true` if calculation check passed.
-
-### 3. Samples (Time Series)
-
-A list of raw snapshots captured from `/sys/fs/cgroup` at the defined `--interval`. Each sample object contains:
-
-* `timestamp`: Time of the snapshot.
-* `usage_usec`: Total CPU time consumed in microseconds.
-* `user_usec`: CPU time spent in user space.
-* `system_usec`: CPU time spent in kernel space.
-* `nr_throttled`: Cumulative count of throttle events.
-* `mem_bytes`: Total memory usage (RSS + Cache).
-* `rss_bytes`: Resident Set Size.
-
-### 4. Additional Metrics (Computed)
-
-Derived from processing the raw cgroup samples:
-
-* `cold_start_time`: Startup latency (`running_time` - `start`).
-* `avg_cpu_cores`: Average CPU usage normalized to cores (e.g., 1.0 = 1.0 cores used).
-* `peak_mem_bytes`: The highest memory usage observed during the trial.
-* `avg_mem_bytes`: The average memory usage throughout the execution.
-* `throttled_events`: The total number of times the CPU was throttled by the cgroup controller.
+GPLv3, see [LICENSE](LICENSE).
