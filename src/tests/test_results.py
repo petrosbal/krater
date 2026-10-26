@@ -27,8 +27,8 @@ def test_trial_key(combination, expected):
      {'image': 'reg/krater:x', 'runtime_class': 'default'},
      Path('results/b/reg_krater_x_default.json')),
 ])
-def test_results_path(name, environment, expected):
-    assert results.path(name, environment) == expected
+def test_file_path(name, environment, expected):
+    assert results.file_path(name, environment) == expected
 
 RESULTS_HEADER_RUN = {
     'duration': 59,
@@ -77,7 +77,7 @@ def test_file_for_reopens_a_saved_file(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     saved = {**results.header(RESULTS_HEADER_RUN, RESULTS_HEADER_ENVIRONMENT),
              'trials': {'size = 64': [{'trial': 1}]}}
-    results.save(results.path('b', RESULTS_HEADER_ENVIRONMENT), saved)
+    results.save(results.file_path('b', RESULTS_HEADER_ENVIRONMENT), saved)
     file, problem = results.file_for({**RESULTS_HEADER_RUN, 'name': 'b'}, RESULTS_HEADER_ENVIRONMENT)
 
     assert file == saved
@@ -87,7 +87,7 @@ def test_file_for_refuses_a_changed_setting(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     saved = {**results.header(RESULTS_HEADER_RUN, RESULTS_HEADER_ENVIRONMENT),
              'trials': {}}
-    results.save(results.path('b', RESULTS_HEADER_ENVIRONMENT), saved)
+    results.save(results.file_path('b', RESULTS_HEADER_ENVIRONMENT), saved)
     file, problem = results.file_for({**RESULTS_HEADER_RUN, 'name': 'b', 'cpu': '500m'},
                                      RESULTS_HEADER_ENVIRONMENT)
 
@@ -119,7 +119,7 @@ def test_keep_entry_drops_an_entry_that_is_not_done(tmp_path, monkeypatch):
 
     assert done is False
     assert file['trials'] == {}
-    assert not results.path('b', RESULTS_HEADER_ENVIRONMENT).exists()
+    assert not results.file_path('b', RESULTS_HEADER_ENVIRONMENT).exists()
 
 # keep_entry saves before it touches file, so a failed save can't leave
 # an entry in memory that the disk doesn't have

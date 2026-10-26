@@ -55,7 +55,7 @@ def banner(run: dict, files: list[dict], combinations: list[dict], pending: list
     trials_saved = total_trials - len(pending)
     floor = len(pending) * (RUNNER_SLEEP + run['warmup'] + run['duration'] + RUNNER_TAIL_SLEEP)
     ceiling = len(pending) * run['timeout']
-    folder = results.path(run['name'], files[0]['environment']).parent
+    folder = results.folder_path(run['name'])
 
     rows = [("started", current_datetime()),
             ("host", f"{host.node}, {host.system} {host.release}"),

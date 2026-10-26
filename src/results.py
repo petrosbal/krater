@@ -33,9 +33,12 @@ SETTINGS = ("duration", "warmup", "timeout", "cpu", "memory", "interval")
 def trial_key(combination: dict) -> str:
     return ', '.join(f"{k} = {v}" for k,v in sorted(combination.items()))
 
-def path(name: str, environment: dict) -> Path:
+def folder_path(name: str) -> Path:
+    return Path("results") / name
+
+def file_path(name: str, environment: dict) -> Path:
     safe_image_name = environment['image'].replace(':', '_').replace('/', '_')
-    return Path("results") / name / f"{safe_image_name}_{environment['runtime_class']}.json"
+    return folder_path(name) / f"{safe_image_name}_{environment['runtime_class']}.json"
 
 def header(run: dict, environment: dict) -> dict:
     return {"environment": environment,
@@ -97,14 +100,14 @@ def save(path: Path, results: dict) -> None:
     os.replace(tmp, path)
 
 def file_for(run: dict, environment: dict) -> tuple[dict | None, str | None]:
-    file_path = path(run['name'], environment)
+    results_file_path = file_path(run['name'], environment)
     expected_header = header(run, environment)
-    stored_file = load(file_path)
+    stored_file = load(results_file_path)
 
     if stored_file is None:
         return {**expected_header, 'trials': {}}, None
     if (mismatch := header_mismatch(stored_file, expected_header)) is not None:
-        return None, (f"existing results file ({file_path}) does not match this run:\n"
+        return None, (f"existing results file ({results_file_path}) does not match this run:\n"
                       f"{mismatch}\n"
                       "set the config back, use a new run name, or move the file")
     return stored_file, None
@@ -116,11 +119,11 @@ def keep_entry(run: dict, file: dict, combination: dict, entry: dict) -> bool:
         return False
     key = trial_key(combination)
     entries = file['trials'].get(key, [])  + [entry]
-    file_path = path(run['name'], file['environment'])
+    results_file_path = file_path(run['name'], file['environment'])
 
     trials = file['trials'].copy()
     trials[key] = entries
-    save(file_path, {**file, 'trials': trials})
+    save(results_file_path, {**file, 'trials': trials})
 
     file['trials'] = trials
     return True
