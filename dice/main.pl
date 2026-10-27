@@ -15,18 +15,8 @@
 % ==============================================================================
 %!  opt_type(Name, Fact, Type).
 %       The type of each command line option. Fact is the term argv_options/3
-%       returns, which is also what opt_help/2 and opt_meta/2 are keyed on.
+%       returns. Defining it makes argv_options/3 refuse unknown options.
 opt_type(arch, architecture, atom).
-
-% ==============================================================================
-%!  opt_help(Fact, Help).
-%       The description --help prints for each command line option.
-opt_help(architecture, "Target architecture, e.g. x86_64 or aarch64").
-
-% ==============================================================================
-%!  opt_meta(Fact, Placeholder).
-%       The placeholder that --help prints for each command line option.
-opt_meta(architecture, "ARCH").
 
 % ==============================================================================
 %!  call_or_throw(Goal, Reason).
@@ -49,7 +39,8 @@ generate(Argv):-
     call_or_throw(option(architecture(Architecture), Options), no_architecture),
     call_or_throw(load_build_facts(
         'krater.yaml', Architecture), rejected_config),
-    call_or_throw(write_dockerfile('dice/generated/Dockerfile'), underivable),
+    call_or_throw(write_dockerfile(
+        'dice/generated/Dockerfile'), underivable),
     call_or_throw(write_environments(
         'dice/generated/available_environments.yaml'), underivable).
 
@@ -58,6 +49,5 @@ generate(Argv):-
 %       Generates both files, or explains the refusal and exits non-zero. The
 %       only predicate that calls halt/1.
 main(Argv):-
-    catch(generate(Argv), refused(Reason),
-          ( explain(Reason), halt(1) )).
-
+    catch(generate(Argv), refused(Reason), ( explain(Reason),
+                                             halt(1) )).
