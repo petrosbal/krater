@@ -21,7 +21,7 @@ This runs `swipl dice/main.pl --arch=$(uname -m)`. `--arch` is required and only
 
 Requires SWI-Prolog with `library(yaml)` and `library(pcre)`. `make check-deps` checks both.
 
-**Tip**: Don't edit `generated/` by hand, edit the YAML then regenerate.
+**Tip**: *Don't edit `generated/` by hand. Edit the YAML, then regenerate.*
 
 ## Configuration
 

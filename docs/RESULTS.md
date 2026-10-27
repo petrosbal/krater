@@ -66,3 +66,9 @@ Each sample has a `timestamp` in epoch seconds. A counter is the total since the
 ## Saved trials
 
 A file holds every trial that has a result and samples covering its window, and every trial that failed with one of the three reasons. Any other trial runs again on the next `make run` with the same `run.name`.
+
+## Session log
+
+Each run also gets a log, `results/<name>/<name>.log`, for instance `results/demo/demo.log`. It holds everything each session printed, in the order printed. A session writes to it from the moment you answer `y`, and adds to the end, starting with its banner.
+
+**Tip**: *Use `tail -f results/<name>/<name>.log` to follow a session from another terminal.*

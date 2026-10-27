@@ -45,6 +45,6 @@ make run
 
 The committed `krater.yaml` is a short demo, one trial per environment and size. KRATER checks the config, the cluster and every environment, then shows the session and asks `continue? [y/N]`. Answer `y` to start. `Ctrl-C` stops it at any point, and `make run` again with the same `name` picks up where it stopped.
 
-Each environment's trials go to one file in `results/demo/`. [RESULTS.md](RESULTS.md) describes what's in it, and [CONFIGURATION.md](CONFIGURATION.md) every key for a full experiment.
+Each environment's trials go to one file in `results/demo/`, and everything the session printed goes to `results/demo/demo.log`. [RESULTS.md](RESULTS.md) describes both, and [CONFIGURATION.md](CONFIGURATION.md) explains every key for a full experiment.
 
 To benchmark your own workload, see [workloads/README.md](../workloads/README.md).
