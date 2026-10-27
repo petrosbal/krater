@@ -1,3 +1,5 @@
+import io
+
 import pytest
 
 import krater
@@ -40,3 +42,19 @@ def test_run_rounds_stops_properly(monkeypatch, capsys):
 ])
 def test_exit_code(was_stopped, trials_left, expected):
     assert krater.exit_code(was_stopped, trials_left) == expected
+
+def test_stream_gets_logged():
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    log = io.StringIO()
+
+    stdout_writer = krater.LoggedStream(stdout, log)
+    stderr_writer = krater.LoggedStream(stderr, log)
+
+    print("1", file=stdout_writer)
+    print("2", file=stderr_writer)
+    print("3", file=stdout_writer)
+
+    assert stdout.getvalue() == '1\n3\n'
+    assert stderr.getvalue() == '2\n'
+    assert log.getvalue() == '1\n2\n3\n'

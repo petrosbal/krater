@@ -18,10 +18,12 @@
 Runs a benchmarking session. The only module that prints, exits or reads stdin.
 """
 
+import atexit
 import itertools
 import platform
 import sys
 import time
+from typing import TextIO
 
 import cgroup
 import console
@@ -35,6 +37,40 @@ from config import (
     validate,
 )
 
+
+class LoggedStream:
+    def __init__(self, stream: TextIO, log: TextIO) -> None:
+        self.stream = stream
+        self.log = log
+
+    def write(self, text: str) -> None:
+        self.stream.write(text)
+        self.log.write(text)
+
+    def flush(self) -> None:
+        self.stream.flush()
+        self.log.flush()
+
+# python flushes stdout and stderr once more after this runs
+# so they stop leading to the log before it closes
+# or python exits with 120 (file flush error)
+def close_log(log: TextIO) -> None:
+    sys.stdout = sys.__stdout__
+    sys.stderr = sys.__stderr__
+    log.close()
+
+def activate_logging(name: str, banner: str) -> None:
+    subfolder = results.folder_path(name)
+    subfolder.mkdir(parents=True, exist_ok=True)
+    log_file_path = subfolder / f"{name}.log"
+
+    # no 'with' here, or else the log closes when this function returns
+    # close_log closes it at exit instead
+    log = open(log_file_path, "a", buffering=1, encoding="utf-8") # noqa: SIM115
+    print(banner, file=log)
+    atexit.register(close_log, log)
+    sys.stdout = LoggedStream(sys.stdout, log)
+    sys.stderr = LoggedStream(sys.stderr, log)
 
 # cartesian product. takes {'size': [5, 10], 'mode': ['a', 'b']} and returns
 #       1. {'size': 5,  'mode': 'a'}
@@ -153,9 +189,11 @@ def main() -> None:
 
     pending = results.pending_trials(files, combinations, run['trials'])
     if pending:
-        print(console.banner(run, files, combinations, pending, cgroup.cpu_governor(), cgroup.cpu_model()), flush=True)
+        banner = console.banner(run, files, combinations, pending, cgroup.cpu_governor(), cgroup.cpu_model())
+        print(banner, flush=True)
         if not user_confirmation():
             sys.exit("nothing ran")
+        activate_logging(run['name'], banner)
     else:
         print(f"run \"{run['name']}\" is complete, nothing to run")
 
