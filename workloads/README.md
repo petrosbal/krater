@@ -10,7 +10,7 @@ A workload includes the runner and defines three functions. The runner owns `mai
 #include "workload_runner.h"
 
 static void bench_setup(void)  { /* once, before timing */ }
-static void bench_unit(void)   { /* the measured unit, the same work every call */ }
+static void bench_unit(void)   { /* the measured unit */ }
 static void bench_report(long units, double elapsed) { /* once, after timing */ }
 ```
 

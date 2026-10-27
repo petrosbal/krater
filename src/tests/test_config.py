@@ -58,7 +58,7 @@ def test_refuses_missing_run_key():
     assert validate(config, ENVIRONMENTS) == "'run' missing required keys: timeout"
 
 @pytest.mark.parametrize("key, value, expected", [
-    ("duration",  0,                 "'duration' must be a positive number, got 0"),
+    ("duration",  -2,                "'duration' must be a non-negative number, got -2"),
     ("trials",    True,              "'trials' must be a positive integer, got True"),
     ("trials",    2.5,               "'trials' must be a positive integer, got 2.5"),
     ("warmup",    -1,                "'warmup' must be a non-negative number, got -1"),
@@ -96,6 +96,7 @@ def test_refuses_bad_run_value(key, value, expected):
     assert validate(config, ENVIRONMENTS) == expected
 
 @pytest.mark.parametrize("key, value", [
+    ("duration", 0),
     ("warmup",   0),
     ("interval", 0.1),
     ("timeout",  73),

@@ -30,7 +30,7 @@ Unknown or missing keys are refused, and the refusal names the key.
 | `runtimes` | The runtime classes to run, out of those DICE generated. `default` is runc. |
 | `params` | Each workload parameter with a list of values. Every combination gets its own trials, and each value reaches the pod as an environment variable named after the parameter. |
 | `trials` | Trials per environment and parameter combination. |
-| `duration` | Seconds of the workload's measured loop. |
+| `duration` | Seconds of the workload's measured loop. Set it to 0 to run the unit only once per trial. |
 | `warmup` | Seconds of unmeasured loop before it, `0` for none. |
 | `timeout` | Seconds before Kubernetes ends the pod. |
 | `interval` | Seconds between cgroup samples. |

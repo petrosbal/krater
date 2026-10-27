@@ -21,8 +21,7 @@
 // useful for memory allocation and krater_param_* value reads.
 static void bench_setup(void);
 
-// one unit of work. the thing being measured. called repeatedly at least once.
-// should do the same amount of work every call.
+// one unit of work. the thing being measured
 static void bench_unit(void);
 
 // called once after timing ends, for validity checks, throughput calculation

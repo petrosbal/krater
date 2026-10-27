@@ -78,9 +78,10 @@ def validate(config, environments) -> str | None:
     if missing := RUN_KEYS - run.keys():
         return f"'run' missing required keys: {name_list(missing)}"
 
+    # zero duration means just one bench_unit call
     duration = run['duration']
-    if not is_number(duration) or not duration > 0:
-        return f"'duration' must be a positive number, got {duration!r}"
+    if not is_number(duration) or not duration >= 0:
+        return f"'duration' must be a non-negative number, got {duration!r}"
 
     trials = run['trials']
     if not is_number(trials) or not isinstance(trials, int) or not trials > 0:
