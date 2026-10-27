@@ -144,6 +144,8 @@ def validate_params(params) -> str | None:
                 return f"values for parameter {name!r} must be numbers or strings"
             if isinstance(value, str) and any(c in value for c in [',', '=']):
                 return f"value {value!r} contains ',' or '='"
+            if isinstance(value, str) and value.strip() == "":
+                return f"values for parameter {name!r} must not be empty"
         # the same number written differently, like 256 and 256.0
         if len(valuelist) != len(set(valuelist)):
             return f"parameter {name!r} has duplicate values"

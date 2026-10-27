@@ -83,6 +83,8 @@ def test_refuses_missing_run_key():
     ("params",    {"n": [1, 1.0]},   "parameter 'n' has duplicate values"),
     ("params",    {"n": ["a,b"]},    "value 'a,b' contains ',' or '='"),
     ("params",    {"n": ["x=1"]},    "value 'x=1' contains ',' or '='"),
+    ("params",    {"n": [""]},       "values for parameter 'n' must not be empty"),
+    ("params",    {"n": ["  "]},     "values for parameter 'n' must not be empty"),
     ("runtimes",  [],                "'runtimes' must be a non-empty list"),
     ("runtimes",  "wasmtime",        "'runtimes' must be a non-empty list"),
     ("runtimes",  ["wasmtime", 1],   "'runtimes' must contain strings only"),
